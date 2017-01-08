@@ -179,20 +179,20 @@ struct MidiMessage
 class MidiHeap
 {
    private:
-      MidiMessage     *ar;
-      pthread_mutex_t  mutex;
-      pthread_cond_t   canWrite;
-      pthread_cond_t   canRead;
-      size_t           size;               // Maximum size (or array size).
-      size_t           top;                // Current top position.
+      MidiMessage     *mArray;
+      pthread_mutex_t  mMutex;
+      pthread_cond_t   mbCanWrite;
+      pthread_cond_t   mbCanRead;
+      size_t           mSize;              // Maximum size (or array size).
+      size_t           mTop;               // Current top position.
 
       /***************************************************/
       /* Swap two elements with the given indicies. */
       inline void swap(size_t i, size_t j)
       {
-         MidiMessage t = ar[i];
-         ar[i] = ar[j];
-         ar[j] = t;
+         MidiMessage t = mArray[i];
+         mArray[i] = mArray[j];
+         mArray[j] = t;
       }
 
       /***************************************************/
@@ -221,19 +221,19 @@ class MidiHeap
       inline size_t imin(size_t i, size_t j)
       {
          // If only one exists.
-         if (i < top && j >= top)
+         if (i < mTop && j >= mTop)
             return i;
-         if (i >= top && j < top)
+         if (i >= mTop && j < mTop)
             return j;
-         if (i >= top && j >= top)
+         if (i >= mTop && j >= mTop)
             return (size_t) -1;
 
          // Compare the two by the time and the port number.
-         if (ar[i].time < ar[j].time)
+         if (mArray[i].time < mArray[j].time)
             return i;
-         else if (ar[i].time > ar[j].time)
+         else if (mArray[i].time > mArray[j].time)
             return j;
-         else if (ar[i].port < ar[j].port)
+         else if (mArray[i].port < mArray[j].port)
             return i;
          else
             return j;
@@ -245,7 +245,7 @@ class MidiHeap
       {
          size_t j = imin(lchild(i), rchild(i));
 
-         while (j != (size_t)-1 && ar[i].time > ar[j].time)
+         while (j != (size_t)-1 && mArray[i].time > mArray[j].time)
          {
             swap(i, j);
             i = j;
@@ -257,16 +257,16 @@ class MidiHeap
       /***************************************************/
       MidiHeap(size_t s)
       {
-         ar = new MidiMessage[s];
-         size = s;
-         pthread_mutex_init(&mutex, NULL);
+         mArray = new MidiMessage[s];
+         mSize = s;
+         pthread_mutex_init(&mMutex, NULL);
       }
 
       /***************************************************/
       ~MidiHeap()
       {
-         delete ar;
-         pthread_mutex_destroy(&mutex);
+         delete mArray;
+         pthread_mutex_destroy(&mMutex);
       }
 
       /***************************************************/
@@ -274,22 +274,22 @@ class MidiHeap
          The function locks until there is a space in the buffer. */
       void insert(MidiMessage &msg)
       {
-         pthread_mutex_lock(&mutex);
+         pthread_mutex_lock(&mMutex);
 
-         if (top + 1 >= size)
-            pthread_cond_wait(&canWrite, &mutex);
+         if (mTop + 1 >= mSize)
+            pthread_cond_wait(&mbCanWrite, &mMutex);
 
-         size_t i = top ++;
-         ar[i] = msg;
+         size_t i = mTop ++;
+         mArray[i] = msg;
 
-         while (parent(i) != (size_t)-1 && ar[i].time < ar[parent(i)].time)
+         while (parent(i) != (size_t)-1 && mArray[i].time < mArray[parent(i)].time)
          {
             swap(i, parent(i));
             i = parent(i);
          }
 
-         pthread_cond_broadcast(&canRead);
-         pthread_mutex_unlock(&mutex);
+         pthread_cond_broadcast(&mbCanRead);
+         pthread_mutex_unlock(&mMutex);
       }
 
       /***************************************************/
@@ -297,18 +297,18 @@ class MidiHeap
          The function locks until there is an element to read. */
       MidiMessage popMin()
       {
-         pthread_mutex_lock(&mutex);
+         pthread_mutex_lock(&mMutex);
 
-         if (top == 0)
-            pthread_cond_wait(&canRead, &mutex);
+         if (mTop == 0)
+            pthread_cond_wait(&mbCanRead, &mMutex);
 
-         MidiMessage min = ar[0];
-         ar[0] = ar[top - 1];
-         top --;
+         MidiMessage min = mArray[0];
+         mArray[0] = mArray[mTop - 1];
+         mTop --;
          bubbleDown(0);
 
-         pthread_cond_broadcast(&canWrite);
-         pthread_mutex_unlock(&mutex);
+         pthread_cond_broadcast(&mbCanWrite);
+         pthread_mutex_unlock(&mMutex);
 
          return min;
       }
@@ -320,12 +320,12 @@ class MidiHeap
       {
          MidiMessage min;
 
-         pthread_mutex_lock(&mutex);
-         if (top == 0)
-            pthread_cond_wait(&canRead, &mutex);
+         pthread_mutex_lock(&mMutex);
+         if (mTop == 0)
+            pthread_cond_wait(&mbCanRead, &mMutex);
 
-         min = ar[0];
-         pthread_mutex_unlock(&mutex);
+         min = mArray[0];
+         pthread_mutex_unlock(&mMutex);
 
          return min;
       }
@@ -334,7 +334,7 @@ class MidiHeap
       /* The number of elements available in the buffer. */
       size_t count()
       {
-         return top;
+         return mTop;
       }
 };
 
@@ -343,23 +343,22 @@ class MidiHeap
 class JackEngine
 {
    private:
-      MidiHeap          *midiHeap;        // A sorted queue of midi events.
-      jack_client_t     *client;          // The client representation.
-      jack_ringbuffer_t *ringbuffer;
-      jack_nframes_t     bufferSize;
+      MidiHeap          *mMidiHeap;        // A sorted queue of midi events.
+      jack_client_t     *mClient;          // The client representation.
+      jack_ringbuffer_t *mRingbuffer;
+      jack_nframes_t     mBufferSize;
 
-      pthread_t          midiWriteThread;
+      pthread_t          mMidiWriteThread;
 
-      std::vector<jack_port_t*> outputPorts;
-      size_t                    portCount;
+      std::vector<jack_port_t*> mOutputPorts;
 
       /***************************************************/
       /* Write the midi message into the ringbuffer which is processed by jack callback in its turn. */
       void writeMidiData(MidiMessage theMessage)
       {
-         if (jack_ringbuffer_write_space(ringbuffer) > sizeof(MidiMessage))
+         if (jack_ringbuffer_write_space(mRingbuffer) > sizeof(MidiMessage))
          {
-            if (jack_ringbuffer_write(ringbuffer, (const char*) &theMessage, sizeof(MidiMessage)) != sizeof(MidiMessage))
+            if (jack_ringbuffer_write(mRingbuffer, (const char*) &theMessage, sizeof(MidiMessage)) != sizeof(MidiMessage))
                std::cerr << "WARNING! Midi message is not written entirely." << std::endl;
          }
          return;
@@ -374,13 +373,12 @@ class JackEngine
       /***************************************************/
       JackEngine()
       {
-         portCount = 0;
       }
 
       /***************************************************/
       ~JackEngine()
       {
-         delete midiHeap;
+         delete mMidiHeap;
       }
 
       /***************************************************/
@@ -391,47 +389,47 @@ class JackEngine
          jack_status_t  status;
 
          // Midi event heap.
-         midiHeap = new MidiHeap(256);
+         mMidiHeap = new MidiHeap(256);
 
          // Create the ringbuffer.
-         ringbuffer = jack_ringbuffer_create(1024 * sizeof(MidiMessage));
+         mRingbuffer = jack_ringbuffer_create(1024 * sizeof(MidiMessage));
 
-         if ((client = jack_client_open("jctracker", options, &status)) == 0)
+         if ((mClient = jack_client_open("jctracker", options, &status)) == 0)
             throw "Jack server is not running.";
 
          // Set the callbacks.
-         jack_set_process_callback(client, jack_process_cb, (void*) this);
-         jack_on_shutdown(client, jack_shutdown_cb, (void*) this);
+         jack_set_process_callback(mClient, jack_process_cb, (void*) this);
+         jack_on_shutdown(mClient, jack_shutdown_cb, (void*) this);
 
-         sampleRate = jack_get_sample_rate(client);
+         sampleRate = jack_get_sample_rate(mClient);
 
          // Create two ports.
-         input_port  = jack_port_register(client, "input",  JACK_DEFAULT_MIDI_TYPE, JackPortIsInput,  0);
-         defaultOutputPort = jack_port_register(client, "default", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-         outputPorts.push_back(defaultOutputPort);
+         input_port  = jack_port_register(mClient, "input",  JACK_DEFAULT_MIDI_TYPE, JackPortIsInput,  0);
+         defaultOutputPort = jack_port_register(mClient, "default", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+         mOutputPorts.push_back(defaultOutputPort);
 
          // Find out the buffer size.
-         bufferSize = jack_get_buffer_size(client);
+         mBufferSize = jack_get_buffer_size(mClient);
 
-         if (jack_activate(client))
+         if (jack_activate(mClient))
             throw "cannot activate Jack client";
 
-         pthread_create(&midiWriteThread, NULL, bufferProcessingThread, this);
+         pthread_create(&mMidiWriteThread, NULL, bufferProcessingThread, this);
       }
 
       /***************************************************/
       /* Register an output port. */
       jack_port_t* registerOutputPort(std::string name)
       {
-         for (std::vector<jack_port_t*>::iterator it = outputPorts.begin();
-              it != outputPorts.end(); it ++)
+         for (std::vector<jack_port_t*>::iterator it = mOutputPorts.begin();
+              it != mOutputPorts.end(); it ++)
          {
             if (name == jack_port_short_name(*it))
                return *it;
          }
 
-         jack_port_t *p = jack_port_register(client, name.c_str(), JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-         outputPorts.push_back(p);
+         jack_port_t *p = jack_port_register(mClient, name.c_str(), JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+         mOutputPorts.push_back(p);
          return p;
       }
 
@@ -439,16 +437,16 @@ class JackEngine
       /* Connect to a port. */
       int connectPort(jack_port_t *port, std::string destination)
       {
-         return jack_connect(client, jack_port_name(port), destination.c_str());
+         return jack_connect(mClient, jack_port_name(port), destination.c_str());
       }
 
       /***************************************************/
       /* Shutdown the jack interface. */
       void shutdown()
       {
-         jack_port_unregister(client, input_port);
-         jack_port_unregister(client, defaultOutputPort);
-         jack_client_close(client);
+         jack_port_unregister(mClient, input_port);
+         jack_port_unregister(mClient, defaultOutputPort);
+         jack_client_close(mClient);
       }
 
       /***************************************************/
@@ -462,21 +460,21 @@ class JackEngine
       /* Return the current time in nframes. */
       jack_nframes_t currentFrameTime()
       {
-         return jack_frame_time(client);
+         return jack_frame_time(mClient);
       }
 
       /***************************************************/
       /* Is there are unprocessed midi events. */
       bool hasPendingEvents()
       {
-         return midiHeap->count() > 0;
+         return mMidiHeap->count() > 0;
       }
 
       /***************************************************/
       /* Put a midi message into the heap. */
       void queueMidiEvent(MidiMessage &message)
       {
-         midiHeap->insert(message);
+         mMidiHeap->insert(message);
       }
 
       /***************************************************/
@@ -485,15 +483,15 @@ class JackEngine
             unsigned channel = 0, jack_port_t *port = NULL)
       {
          MidiMessage msg (b0, b1, b2, time, channel, port);
-         midiHeap->insert(msg);
+         mMidiHeap->insert(msg);
       }
 
       /***************************************************/
       /* Send a control midi message to stop all sounds. */
       void stopSounds()
       {
-         for (std::vector<jack_port_t*>::iterator it = outputPorts.begin();
-              it != outputPorts.end(); it ++)
+         for (std::vector<jack_port_t*>::iterator it = mOutputPorts.begin();
+              it != mOutputPorts.end(); it ++)
          {
             MidiMessage msg(MIDI_CONTROLLER, MIDI_ALL_SOUND_OFF, 0, currentFrameTime(), 0, (*it));
             writeMidiData(msg);
@@ -530,11 +528,11 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
    void *portbuffer = NULL;
 
    int t = 0;
-   jack_nframes_t lastFrameTime = jack_last_frame_time(jack->client);
+   jack_nframes_t lastFrameTime = jack_last_frame_time(jack->mClient);
 
    // Clear all buffer first.
-   for (std::vector<jack_port_t*>::iterator it = jack->outputPorts.begin();
-         it != jack->outputPorts.end();
+   for (std::vector<jack_port_t*>::iterator it = jack->mOutputPorts.begin();
+         it != jack->mOutputPorts.end();
          it ++)
    {
       void *pbuf = jack_port_get_buffer(*it, nframes);
@@ -543,10 +541,10 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
    }
 
    // Read the data from the ringbuffer.
-   while (jack_ringbuffer_read_space(gJack.ringbuffer) >= sizeof(MidiMessage))
+   while (jack_ringbuffer_read_space(gJack.mRingbuffer) >= sizeof(MidiMessage))
    {
       MidiMessage midiData;
-      if (jack_ringbuffer_peek(gJack.ringbuffer, (char*)&midiData, sizeof(MidiMessage)) != sizeof(MidiMessage))
+      if (jack_ringbuffer_peek(gJack.mRingbuffer, (char*)&midiData, sizeof(MidiMessage)) != sizeof(MidiMessage))
       {
          std::cerr << "WARNING! Incomplete MIDI message read." << std::endl;
          continue;
@@ -556,7 +554,7 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
       if (t >= (int)nframes)
          break;
 
-      jack_ringbuffer_read_advance(gJack.ringbuffer, sizeof(MidiMessage));
+      jack_ringbuffer_read_advance(gJack.mRingbuffer, sizeof(MidiMessage));
 
       if (t < 0)
          t = 0;
@@ -614,8 +612,8 @@ void* bufferProcessingThread(void *arg)
    while (gPlaying)
    {
       // While we have an upcoming events that should be sent in the next buffer, do write them in the ringbuffer.
-      while (jack->midiHeap->peekMin().time <= jack->currentFrameTime() + 100)
-         jack->writeMidiData(jack->midiHeap->popMin());
+      while (jack->mMidiHeap->peekMin().time <= jack->currentFrameTime() + 100)
+         jack->writeMidiData(jack->mMidiHeap->popMin());
 
       usleep(1000);
    }
@@ -887,31 +885,31 @@ struct PortMap
 /* Parse an input line. */
 class Parser
 {
-   size_t channelNum;
-   std::vector<NoteEvent> *lastNote;
-   NoteEvent dfltNote;
-   unsigned volume;
-   std::vector<int> *signs;
-   std::map<std::string, std::string> aliases;
-   std::vector<PortMap> columnToPortMap;
-   int transpose;
+   size_t mChannelNum;
+   std::vector<NoteEvent> *mLastNote;
+   NoteEvent mDfltNote;
+   unsigned mVolume;
+   std::vector<int> *mSigns;
+   std::map<std::string, std::string> mAliases;
+   std::vector<PortMap> mColumnMap;
+   int mTranspose;
 
    public:
       // Create the parser.
       Parser(size_t chan = 64)
       {
-         signs = new std::vector<int>(12, 0);
-         channelNum = chan;
-         lastNote = new std::vector<NoteEvent>(chan, NoteEvent(0,0,0,0,0));
-         dfltNote.set(0,0,0,0);
-         transpose = 0;
-         volume = 64;
+         mSigns = new std::vector<int>(12, 0);
+         mChannelNum = chan;
+         mLastNote = new std::vector<NoteEvent>(chan, NoteEvent(0,0,0,0,0));
+         mDfltNote.set(0,0,0,0);
+         mTranspose = 0;
+         mVolume = 64;
       }
 
       ~Parser()
       {
-         delete lastNote;
-         delete signs;
+         delete mLastNote;
+         delete mSigns;
       }
 
       // Parse a given line (with one or multiple directives or patterns).
@@ -967,7 +965,7 @@ class Parser
                   continue;
 
                NoteEvent n (chunk.substr(1));
-               signs->at(n.pitch % 12) = mod;
+               mSigns->at(n.pitch % 12) = mod;
             }
 
             return eventList;
@@ -983,7 +981,7 @@ class Parser
             try 
             {
                NoteEvent n (chunk);
-               dfltNote.set(n.pitch, n.volume, n.time, n.delay);
+               mDfltNote.set(n.pitch, n.volume, n.time, n.delay);
             }
             catch (int e)
             {
@@ -996,7 +994,7 @@ class Parser
          // Set the default volume.
          if (chunk == "volume")
          {
-            iss >> volume;
+            iss >> mVolume;
             return eventList;
          }
 
@@ -1012,7 +1010,7 @@ class Parser
          // Transposition.
          if (chunk == "transpose")
          {
-            iss >> transpose;
+            iss >> mTranspose;
             return eventList;
          }
 
@@ -1046,11 +1044,11 @@ class Parser
             jack_port_t *port = gJack.registerOutputPort(portName);
 
             // Associate the columns.
-            if (columnToPortMap.size() < columnB)
-               columnToPortMap.resize(columnB);
+            if (mColumnMap.size() < columnB)
+               mColumnMap.resize(columnB);
 
             for (unsigned i = columnA; i <= columnB; i ++)
-               columnToPortMap[i - 1] = PortMap(channel, port);
+               mColumnMap[i - 1] = PortMap(channel, port);
 
             // Try to link to the destination port.
             iss.clear();
@@ -1071,11 +1069,11 @@ class Parser
 
             if (!(iss >> replacement))
             {
-               aliases.erase(alias);
+               mAliases.erase(alias);
                return eventList;
             }
 
-            aliases[alias] = replacement;
+            mAliases[alias] = replacement;
             return eventList;
          }
 
@@ -1110,8 +1108,8 @@ class Parser
                   return eventList;
 
                // An aliased name.
-               if (aliases.find(chunk) != aliases.end())
-                  chunk = aliases[chunk];
+               if (mAliases.find(chunk) != mAliases.end())
+                  chunk = mAliases[chunk];
 
                // Silent note.
                if (chunk == ".")
@@ -1123,11 +1121,11 @@ class Parser
 
                // Default note.
                else if (chunk == "*")
-                  eventList.push_back(dfltNote.clone());
+                  eventList.push_back(mDfltNote.clone());
 
                // Previous note.
                else if (chunk == "^")
-                  eventList.push_back(lastNote->at(column).clone());
+                  eventList.push_back(mLastNote->at(column).clone());
 
                // And finally this must be a real note:
                else
@@ -1136,14 +1134,14 @@ class Parser
 
                   // Aply modifiers.
                   if (n->volume == (unsigned)-1)
-                     n->volume = volume;                        // Apply the default volume.
+                     n->volume = mVolume;                        // Apply the default volume.
                   if (!n->natural)
-                     n->pitch += signs->at(n->pitch % 12);      // Apply the default sign.
-                  n->pitch += transpose;                        // Apply the transposition.
+                     n->pitch += mSigns->at(n->pitch % 12);      // Apply the default sign.
+                  n->pitch += mTranspose;                        // Apply the transposition.
                   n->column = column;
 
                   // Store the value for the lastNote pattern.
-                  lastNote->at(column).set(n->pitch, n->volume, n->time, n->delay);
+                  mLastNote->at(column).set(n->pitch, n->volume, n->time, n->delay);
 
                   // Push the event into the return list.
                   eventList.push_back(n);
@@ -1162,9 +1160,9 @@ class Parser
       PortMap& getPortMap(unsigned column)
       {
          static PortMap dfltMap (0, NULL);
-         if (column >= columnToPortMap.size())
+         if (column >= mColumnMap.size())
             return dfltMap;
-         return columnToPortMap[column];
+         return mColumnMap[column];
       }
 };
 
@@ -1172,15 +1170,15 @@ class Parser
 /* Interpret and process the pattern line by line. */
 class Sequencer
 {
-   std::vector<std::vector<Event*> > song;
-   Parser parser;
-   size_t currentPos;
-   std::list<std::pair<int, unsigned> > loopStack;
+   std::vector<std::vector<Event*> > mSong;
+   Parser mParser;
+   size_t mCurrentPos;
+   std::list<std::pair<int, unsigned> > mLoopStack;
 
    public:
       Sequencer(JackEngine *j)
       {
-         currentPos = 0;
+         mCurrentPos = 0;
       }
 
       /*****************************************************/
@@ -1193,9 +1191,9 @@ class Sequencer
          {
             try
             {
-               std::vector<Event*> lst = parser.parseLine(line);
+               std::vector<Event*> lst = mParser.parseLine(line);
                if (!lst.empty())
-                  song.push_back(lst);
+                  mSong.push_back(lst);
             }
             catch (int e)
             {
@@ -1209,43 +1207,43 @@ class Sequencer
       std::vector<Event*> getNextLine()
       {
          // Check if we reached the end. Return empty vector if so.
-         if (currentPos >= song.size())
+         if (mCurrentPos >= mSong.size())
             return std::vector<Event*> ();
 
-         LoopEvent     *lp = dynamic_cast<LoopEvent*>(song[currentPos][0]);
-         EndLoopEvent *elp = dynamic_cast<EndLoopEvent*>(song[currentPos][0]);
+         LoopEvent     *lp = dynamic_cast<LoopEvent*>(mSong[mCurrentPos][0]);
+         EndLoopEvent *elp = dynamic_cast<EndLoopEvent*>(mSong[mCurrentPos][0]);
 
          if (lp || elp)
          {
             if (lp != NULL)
                // The beginning of a loop; push the starting point to the loop stack.
-               loopStack.push_back(std::pair<int, unsigned>(lp->count, currentPos));
+               mLoopStack.push_back(std::pair<int, unsigned>(lp->count, mCurrentPos));
 
             else if (elp != NULL)
             {
                // End of the loop; move the pointer to the beginning of the loop.
-               if (loopStack.size() > 0)
+               if (mLoopStack.size() > 0)
                {
-                  if (loopStack.back().first == -1 || (-- loopStack.back().first) > 0)
-                     currentPos = loopStack.back().second;
+                  if (mLoopStack.back().first == -1 || (-- mLoopStack.back().first) > 0)
+                     mCurrentPos = mLoopStack.back().second;
                   else
-                     loopStack.pop_back();
+                     mLoopStack.pop_back();
                }
             }
 
-            currentPos ++;
+            mCurrentPos ++;
             return getNextLine();
          }
 
          else
-            return song[currentPos ++];
+            return mSong[mCurrentPos ++];
       }
 
       /*****************************************************/
       /* Return the mapping of the event's column to the port and channel. */
       PortMap& getPortMap(unsigned column)
       {
-         return parser.getPortMap(column);
+         return mParser.getPortMap(column);
       }
 };
 
