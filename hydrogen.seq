@@ -1,0 +1,46 @@
+;; Simple rhythm for Hydrogen.
+
+tempo 60
+port 1 3 default 0 hydrogen-midi:RX
+
+;; Make some aliases for usable notes.
+alias kickm    c2!20.
+alias kick     c2.
+alias stick    c#2.
+alias snarejz  d2.
+alias clap     d#2.
+alias tomlow   e2.
+alias closedhh f2!20.
+alias tommid   f#2!30.
+alias pedhh    g2.
+alias tomhi    g#2!30.
+alias snarerk  a2.
+alias openhh   a#2.
+alias cowbell  b2.
+alias ridejz   c3.
+alias crash    c#3.
+alias riderk   d3.
+alias crashjz  d#3.
+
+----- 8/4
+loop
+---------------------
+kick     closedhh
+.        closedhh
+.        closedhh
+.        closedhh
+snarejz  closedhh
+.        closedhh
+.        closedhh
+.        closedhh
+---------------------
+kick     closedhh
+.        closedhh
+.        closedhh
+.        closedhh
+snarejz  closedhh
+.        closedhh    tomhi
+.        closedhh    tommid
+kickm    closedhh    
+---------------------
+endloop

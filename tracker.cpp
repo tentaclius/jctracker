@@ -645,6 +645,7 @@ struct NoteEvent : public Event
    double   partTime;   // Playing time in parts of the current note.
 
    bool     natural;    // If the note is of natural tone.
+   bool     endless;    // Do not send NOTE_OFF for this note.
 
    NoteEvent(unsigned n, unsigned v, uint64_t tm, uint64_t dl, unsigned col)
       : column(col)
@@ -655,6 +656,7 @@ struct NoteEvent : public Event
       , partDelay(0)
       , partTime(0)
       , natural(false)
+      , endless(false)
    {}
 
    NoteEvent() { NoteEvent(0,64,0,0,0); }
@@ -774,6 +776,11 @@ struct NoteEvent : public Event
             case '!':
                // Volume modifier.
                iss >> volume;
+               break;
+
+            case '.':
+               // Endless note.
+               endless = true;
                break;
          }
       }
@@ -1306,21 +1313,24 @@ void play(JackEngine *jack, Sequencer &seq)
          NoteEvent *e = dynamic_cast<NoteEvent*>(*jt);
          if (e != NULL)
          {
-            if (e->time == 0 && e->partTime == 0)
+            if (!e->endless)
             {
-               // If the note does not have specific sound time, turn it off at the next cycle.
-               std::pair<unsigned, unsigned> n;
-               n.first = e->pitch;                  // pitch;
-               n.second = column;                   // channel
-               activeNotes.push_back(n);
-            }
-            else
-            {
-               // If the note has specific time, schedule the off event right now.
-               gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
-                     currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay 
-                      + gJack.msToNframes(e->time) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime - 2,
-                     seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+               if (e->time == 0 && e->partTime == 0)
+               {
+                  // If the note does not have specific sound time, turn it off at the next cycle.
+                  std::pair<unsigned, unsigned> n;
+                  n.first = e->pitch;                  // pitch;
+                  n.second = column;                   // channel
+                  activeNotes.push_back(n);
+               }
+               else
+               {
+                  // If the note has specific time, schedule the off event right now.
+                  gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
+                        currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay 
+                        + gJack.msToNframes(e->time) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime - 2,
+                        seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+               }
             }
 
             // Queue the note on event.
