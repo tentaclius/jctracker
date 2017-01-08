@@ -1,0 +1,70 @@
+         ; Comment line. Empty lines does not make a pause in the playback.
+A5       ; The note A of fifth octave.
+C        ; The note C of default (fourth) octave.
+c        ; The same note; parser is case insensitive to notes.
+C#       ; C sharp.
+Bb       ; B flat.
+A#7      ; A shart of 7th octave.
+
+C!40     ; Specify the velocity of the note (0..64).
+C%20     ; Delay before the note plays in microseconds.
+C@100    ; Note playing time in microseconds.
+C%20@200!64    ; All modifiers together. The order does not matter.
+c/.5\2   ; Delay the note 0.5 time of the current note length and play it for 2 times the length.
+
+C E G    ; Play several notes simultaneously.
+
+.        ; Skip a bit. A silent note.
+*        ; Play a default note. The default not is set by "default" command.
+^        ; Play the last played note.
+
+C        ; Start the note...
+|        ; ... and keep playing it while the "|" sign appears in the pattern.
+|        ; ...
+
+; Controlling directives.
+default C#4    ; Set the default note (directive are case sensitive).
+volume 50      ; Set the default volume for the notes (0..64).
+transpose 10   ; Transpose the notes.
+tempo 120      ; Set the playing speed in BPM.
+
+loop 4         ; Play the block for n times.
+; ...          ; If the number of repititions is not specified, the loop will go forever.
+endloop
+
+-------        ; Visual bar separator. The number of '-' signs does not matter.
+----- 3/4      ; You can set the quantization for the following blocks.
+               ; Currently only the nominator is important. It defines how many notes will fit into the next cycle.
+
+--- 4/4 #C     ; Specify the size and default signs.
+--- #A bB nC   ; A-shart, B-flat, natural C.
+
+alias tss C#4  ; Create an alias for a note.
+
+;; Keep in mind that transpose, default, volume and alias modifiers are static, i.e. 
+loop
+c              ; Natural C will be played for all iterations.
+--- #c         ; The signature change only applies to the notes after it.
+c              ; Sharp C for all iterations.
+endloop
+;; The commands are applied at interpretation stage and affects the pattern directly.
+
+;; tempo and --- (separator that also controls the quantization and signs) commands are dynamic.
+;; I.e. in the following example the tempo will change in the middle of the iteration and will stay changed.
+loop
+c
+tempo 120
+c
+endloop
+
+;    _ A column.
+;    | _ [optional] Column range.
+;    | | _ The name of the output port (will be created).
+;    | | |             _ [optional] Channel.
+;    | | |             | _ [optional] Port to try to connect to.
+;    | | |             | |
+port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
+               ; The first, second and the third columns to be sent to
+               ; the output channel named "output_to_zyn".
+               ; The program will make an attempt to connect to the input port
+               ; of "zynaddsubfx", input port midi_in, channel 0.
