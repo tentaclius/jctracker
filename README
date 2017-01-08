@@ -2,7 +2,7 @@ MIDI tracker for Jack audio engine.
 Reads standard input for commands and notes to play, sends the corresponding MIDI events to
 the specified port.
 
-Author: Anton Erdman <tentaclius at gmail.com>
+Author: Anton Erdman <tentaclius at gmail>
 License: BSD. Please see the LICENSE file for details.
 
 The following lines illustrate the valid commands.
