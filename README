@@ -7,6 +7,7 @@ Author: Anton Erdman <tentaclius at gmail>
 License: BSD. Please see the LICENSE file for details.
 
 To compile the program you will need the following packages: g++, make, libjack-jackd2-dev (Jack Audio development files).
+The binary file available in the repository is built on Ubuntu 16.04.1.
 
 The following lines illustrate the valid commands.
 
