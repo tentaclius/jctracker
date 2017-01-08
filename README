@@ -1,3 +1,10 @@
+MIDI tracker for Jack audio engine.
+Reads standard input for commands and notes to play, sends the corresponding MIDI events to
+the specified port.
+
+Author: Anton Erdman <tentaclius at gmail.com>
+License: BSD. Please see the LICENSE file for details.
+
          ; Comment line. Empty lines does not make a pause in the playback.
 A5       ; The note A of fifth octave.
 C        ; The note C of default (fourth) octave.
