@@ -5,6 +5,8 @@ the specified port.
 Author: Anton Erdman <tentaclius at gmail.com>
 License: BSD. Please see the LICENSE file for details.
 
+The following lines illustrate the valid commands.
+
          ; Comment line. Empty lines does not make a pause in the playback.
 A5       ; The note A of fifth octave.
 C        ; The note C of default (fourth) octave.
@@ -18,6 +20,7 @@ C%20     ; Delay before the note plays in microseconds.
 C@100    ; Note playing time in microseconds.
 C%20@200!64    ; All modifiers together. The order does not matter.
 c/.5\2   ; Delay the note 0.5 time of the current note length and play it for 2 times the length.
+         ; If both @ and \ delays are given, the delaying time is the sum of the two.
 
 C E G    ; Play several notes simultaneously.
 
