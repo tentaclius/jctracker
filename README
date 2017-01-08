@@ -1,4 +1,5 @@
-MIDI tracker for Jack audio engine.
+Simple MIDI tracker for Jack audio engine.
+Currently in early development. More features pending.
 Reads standard input for commands and notes to play, sends the corresponding MIDI events to
 the specified port.
 
@@ -24,9 +25,9 @@ c/.5\2   ; Delay the note 0.5 time of the current note length and play it for 2 
 
 C E G    ; Play several notes simultaneously.
 
-.        ; Skip a bit. A silent note.
-*        ; Play a default note. The default not is set by "default" command.
-^        ; Play the last played note.
+.        ; Skip a turn. A silent note.
+*        ; Play a default note. The default note is set by "default" command.
+^        ; Repeat the last note.
 
 C        ; Start the note...
 |        ; ... and keep playing it while the "|" sign appears in the pattern.
@@ -49,7 +50,7 @@ endloop
 --- 4/4 #C     ; Specify the size and default signs.
 --- #A bB nC   ; A-shart, B-flat, natural C.
 
-alias tss C#4  ; Create an alias for a note.
+alias drum C#2 ; Create an alias for the note.
 
 ;; Keep in mind that transpose, default, volume and alias modifiers are static, i.e. 
 loop
@@ -70,7 +71,7 @@ endloop
 ;    _ A column.
 ;    | _ [optional] Column range.
 ;    | | _ The name of the output port (will be created).
-;    | | |             _ [optional] Channel.
+;    | | |             _ [optional] MIDI channel.
 ;    | | |             | _ [optional] Port to try to connect to.
 ;    | | |             | |
 port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
