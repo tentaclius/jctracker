@@ -78,6 +78,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [ ] Jack transport.
 // [ ] Automation channel.
 // [ ] MIDI control messages.
+// [ ] OSC controls.
 // [ ] Input MIDI port to record notes from a MIDI keyboard.
 
 #define MIDI_NOTE_ON                   0x90
