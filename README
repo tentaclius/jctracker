@@ -11,7 +11,6 @@ The binary file available in the repository is built on Ubuntu 16.04.1.
 
 The following lines illustrate the valid commands.
 
-
          ; Comment line. Empty lines does not make a pause in the playback.
 A5       ; The note A of fifth octave.
 C        ; The note C of default (fourth) octave.
