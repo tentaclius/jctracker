@@ -1,6 +1,9 @@
 ;; G.F. Handel. Menuet.
 
+;; Default midi port to connect to the synthesizer.
 port 1 3 default 0 zynaddsubfx:midi_input
+
+;; Fourth column to click via Hydrogen.
 port 4 metronome 0 hydrogen-midi:RX
 
 alias x c#2.
