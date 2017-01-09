@@ -73,6 +73,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
 // [-] Pattern file management: load, unload, reload of multiple patterns.
 // [ ] Transposition separately for each column.
+// [ ] Modifiers to work for aliases.
 // [ ] Unicode sharp/flat/natural signs.
 // [ ] Jack transport.
 // [ ] Automation channel.
@@ -347,6 +348,9 @@ class JackEngine
       jack_client_t     *mClient;          // The client representation.
       jack_ringbuffer_t *mRingbuffer;
       jack_nframes_t     mBufferSize;
+      jack_nframes_t     mSampleRate;
+      jack_port_t       *mDefaultOutputPort;
+      jack_port_t       *mInputPort;      // Isn't used yet.
 
       pthread_t          mMidiWriteThread;
 
@@ -365,10 +369,6 @@ class JackEngine
       }
 
    public:
-      jack_port_t       *input_port;      // Isn't used yet.
-      jack_port_t       *defaultOutputPort;
-
-      jack_nframes_t     sampleRate;
 
       /***************************************************/
       JackEngine()
@@ -401,12 +401,12 @@ class JackEngine
          jack_set_process_callback(mClient, jack_process_cb, (void*) this);
          jack_on_shutdown(mClient, jack_shutdown_cb, (void*) this);
 
-         sampleRate = jack_get_sample_rate(mClient);
+         mSampleRate = jack_get_sample_rate(mClient);
 
          // Create two ports.
-         input_port  = jack_port_register(mClient, "input",  JACK_DEFAULT_MIDI_TYPE, JackPortIsInput,  0);
-         defaultOutputPort = jack_port_register(mClient, "default", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
-         mOutputPorts.push_back(defaultOutputPort);
+         mInputPort  = jack_port_register(mClient, "input",  JACK_DEFAULT_MIDI_TYPE, JackPortIsInput,  0);
+         mDefaultOutputPort = jack_port_register(mClient, "default", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+         mOutputPorts.push_back(mDefaultOutputPort);
 
          // Find out the buffer size.
          mBufferSize = jack_get_buffer_size(mClient);
@@ -444,8 +444,8 @@ class JackEngine
       /* Shutdown the jack interface. */
       void shutdown()
       {
-         jack_port_unregister(mClient, input_port);
-         jack_port_unregister(mClient, defaultOutputPort);
+         jack_port_unregister(mClient, mInputPort);
+         jack_port_unregister(mClient, mDefaultOutputPort);
          jack_client_close(mClient);
       }
 
@@ -453,7 +453,7 @@ class JackEngine
       /* Convert microsecond time to jack nframes. */
       jack_nframes_t msToNframes(uint64_t ms)
       {
-         return ms * sampleRate / 1000;
+         return ms * mSampleRate / 1000;
       }
 
       /***************************************************/
@@ -561,7 +561,7 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
 
       // Initialize output buffer.
       if (midiData.port == 0)
-         midiData.port = jack->defaultOutputPort;
+         midiData.port = jack->mDefaultOutputPort;
       if (portP != midiData.port)
       {
          // The port has changed since the previous iteration or was not yet initialize. Reinitialize the buffer.
@@ -569,7 +569,7 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
 
          // Use the default midi port if no port specified.
          if (portP == NULL)
-            portP = jack->defaultOutputPort;
+            portP = jack->mDefaultOutputPort;
 
          // Get the buffer
          portbuffer = jack_port_get_buffer(portP, nframes);
