@@ -1109,8 +1109,10 @@ class Parser
                   return eventList;
 
                // An aliased name.
-               if (mAliases.find(chunk) != mAliases.end())
-                  chunk.replace(0, chunk.find_first_of("!%@/\\#"), mAliases[chunk]);
+               size_t terminalPosition = chunk.find_first_of("!%@/\\#.");
+               std::string aliasPart = chunk.substr(0, terminalPosition);
+               if (mAliases.find(aliasPart) != mAliases.end())
+                  chunk.replace(0, terminalPosition, mAliases[aliasPart]);
 
                // Silent note.
                if (chunk == ".")
