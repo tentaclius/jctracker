@@ -1157,6 +1157,8 @@ class Parser
          return eventList;
       }
 
+      /***************************************************/
+      /* Return a port to which the column matches. */
       PortMap& getPortMap(unsigned column)
       {
          static PortMap dfltMap (0, NULL);
@@ -1373,7 +1375,6 @@ int main(int argc, char **argv)
    sigemptyset(&action.sa_mask);
    action.sa_flags = 0;
    action.sa_handler = signalHandler;
-   action.sa_flags = 0;
 
    sigaction(2, &action, 0L);
    sigaction(3, &action, 0L);
