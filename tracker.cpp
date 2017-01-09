@@ -73,7 +73,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
 // [-] Pattern file management: load, unload, reload of multiple patterns.
 // [ ] Transposition separately for each column.
-// [ ] Modifiers to work for aliases.
+// [v] Modifiers to work for aliases.
 // [ ] Unicode sharp/flat/natural signs.
 // [ ] Jack transport.
 // [ ] Automation channel.
@@ -1110,7 +1110,7 @@ class Parser
 
                // An aliased name.
                if (mAliases.find(chunk) != mAliases.end())
-                  chunk = mAliases[chunk];
+                  chunk.replace(0, chunk.find_first_of("!%@/\\#"), mAliases[chunk]);
 
                // Silent note.
                if (chunk == ".")
