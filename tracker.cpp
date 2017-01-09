@@ -74,11 +74,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [-] Pattern file management: load, unload, reload of multiple patterns.
 // [ ] Transposition separately for each column.
 // [v] Modifiers to work for aliases.
+// [ ] Add deliberate NOTE_END pattern.
 // [ ] Unicode sharp/flat/natural signs.
 // [ ] Jack transport.
-// [ ] Automation channel.
-// [ ] MIDI control messages.
 // [ ] OSC controls.
+// [ ] MIDI control messages.
 // [ ] Input MIDI port to record notes from a MIDI keyboard.
 
 #define MIDI_NOTE_ON                   0x90
