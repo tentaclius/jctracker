@@ -639,10 +639,11 @@ struct NoteEvent : public Event
    unsigned pitch;      // The pitch of the note.
    unsigned volume;     // The volume.
    
-   uint64_t delay;      // Delay time for the note in microseconds.
-   uint64_t time;       // Time of the note playing in microseconds.
+   double   delay;      // Delay time for the note in microseconds.
+   double   time;       // Time of the note playing in microseconds.
    double   partDelay;  // Delay in parts of the current note.
    double   partTime;   // Playing time in parts of the current note.
+   double   partDiv;
 
    bool     natural;    // If the note is of natural tone.
    bool     endless;    // Do not send NOTE_OFF for this note.
@@ -653,8 +654,9 @@ struct NoteEvent : public Event
       , volume(v)
       , delay(dl)
       , time(tm)
-      , partDelay(1)
+      , partDelay(0)
       , partTime(1)
+      , partDiv(0)
       , natural(false)
       , endless(false)
    {}
@@ -673,6 +675,7 @@ struct NoteEvent : public Event
       delay = 0;
       partTime = 1;
       partDelay = 0;
+      partDiv = 0;
 
       std::istringstream iss (buf);
 
@@ -763,13 +766,16 @@ struct NoteEvent : public Event
                iss >> delay;
                break;
 
-            case '\\':
+            case '+':
                // Playing time in parts of the current note length.
                iss >> partDelay;
                break;
 
             case '/':
-               // Delay time in parts of the current note.
+               iss >> partDiv;
+               break;
+
+            case ':':
                iss >> partTime;
                break;
 
@@ -1366,22 +1372,23 @@ void play(JackEngine *jack, Sequencer &seq)
          {
             if (!e->endless)
             {
-               if (e->time == 0 && e->partTime == 1)
+               if (e->time == 0 && e->partDiv == 0)
                   // If the note does not have specific sound time, turn it off at the next cycle.
                   activeNotes.push_back(e);
                else
                   // If the note has specific time, schedule the off event right now.
                   gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
                         currentTime + gJack.msToNframes(e->delay)
-                        + (e->partDelay != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) / e->partDelay) : 0)
-                        + gJack.msToNframes(e->time) + gJack.msToNframes(60 * 1000 / tempo / quantz) / e->partTime - 2,
+                        + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay / e->partDiv) : 0)
+                        + gJack.msToNframes(e->time)
+                        + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime / e->partDiv) : 0) - 2,
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
             }
 
             // Queue the note on event.
             gJack.queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
                   currentTime + gJack.msToNframes(e->delay)
-                   + (e->partDelay != 0 ? (gJack.msToNframes(60 * 1000 / tempo /quantz) / e->partDelay) : 0)
+                   + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay / e->partDiv) : 0)
                    + e->column,
                   seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
          }

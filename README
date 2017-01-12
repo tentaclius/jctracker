@@ -24,8 +24,9 @@ C!40     ; Specify the velocity of the note (0..64).
 C%20     ; Delay before the note plays in microseconds.
 C@100    ; Note playing time in microseconds.
 C%20@200!64    ; All modifiers together. The order does not matter.
-c/.5\2   ; Delay the note 0.5 time of the current note length and play it for 2 times the length.
-         ; If both @ and \ delays are given, the delaying time is the sum of the two.
+c/2      ; 1/2 of the note length.
+c:4+1/2  ; Note plyaing time is 4/2, start delay is 1/2 of the current note size.
+         ; If both "@" and ":" delays are given, the delaying time is the sum of the two.
 
 C E G    ; Play several notes simultaneously.
 
