@@ -26,6 +26,45 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ Roadmap:
+ [v] Set up jackd skeleton.
+ [v] Try sending few single note_on note_off midi events to the gJack port in process() callback.
+ [v] Signal handler to send midi stop all event.
+ [v] Write the sequencer: note_on at the note appearing; note_off at the next note in the row.
+ [v] Pedaled notes.
+ [v] Sort upcoming midi events by time with a heap.
+ [v] Find a proper way to handle delayed and timed notes.
+ [v] Create event vectors with pre-defined size.
+ [v] Note playing time.
+ [v] Process empty notes, default notes and other templates.
+ [v] Directives: volume, default, tempo etc.
+ [v] Handle loops.
+ [v] Separate threads for different tasks.
+ [v] Implement bar event and sizes support and tempo changes.
+ [v] Transposition ("transpose 20")..
+ [v] Initial signs (bemol/dies) applied to all notes.
+ [v] Aliases for the notes with _hash_tables_!
+ [v] Proper time management.
+ [v] Make the transposition static.
+ [v] Ports and channels assignment.
+ [v] Automatic connection.
+ [v] Move the patterns and the player into separate classes.
+ [v] Note length and timing in parts of current note length.
+ [v] Modifiers to work for aliases.
+ [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
+ [-] Pattern file management: load, unload, reload of multiple patterns.
+ [v] Allow several notes for the channel.
+ [ ] MIDI control messages.
+ [ ] Legato.
+ [ ] OSC controls.
+ [ ] Transposition separately for each column.
+ [ ] Unicode sharp/flat/natural signs.
+ [ ] Add deliberate NOTE_END pattern.
+ [ ] Jack transport.
+ [ ] Input MIDI port to record notes from a MIDI keyboard.
+*/
+
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -45,42 +84,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <jack/ringbuffer.h>
-
-// Roadmap:
-// [v] Set up jackd skeleton.
-// [v] Try sending few single note_on note_off midi events to the gJack port in process() callback.
-// [v] Signal handler to send midi stop all event.
-// [v] Write the sequencer: note_on at the note appearing; note_off at the next note in the row.
-// [v] Pedaled notes.
-// [v] Sort upcoming midi events by time with a heap.
-// [v] Find a proper way to handle delayed and timed notes.
-// [v] Create event vectors with pre-defined size.
-// [v] Note playing time.
-// [v] Process empty notes, default notes and other templates.
-// [v] Directives: volume, default, tempo etc.
-// [v] Handle loops.
-// [v] Separate threads for different tasks.
-// [v] Implement bar event and sizes support and tempo changes.
-// [v] Transposition ("transpose 20")..
-// [v] Initial signs (bemol/dies) applied to all notes.
-// [v] Aliases for the notes with _hash_tables_!
-// [v] Proper time management.
-// [v] Make the transposition static.
-// [v] Ports and channels assignment.
-// [v] Automatic connection.
-// [v] Move the patterns and the player into separate classes.
-// [v] Note length and timing in parts of current note length.
-// [v] Modifiers to work for aliases.
-// [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
-// [-] Pattern file management: load, unload, reload of multiple patterns.
-// [v] Allow several notes for the channel.
-// [ ] MIDI control messages.
-// [ ] OSC controls.
-// [ ] Transposition separately for each column.
-// [ ] Unicode sharp/flat/natural signs.
-// [ ] Add deliberate NOTE_END pattern.
-// [ ] Jack transport.
-// [ ] Input MIDI port to record notes from a MIDI keyboard.
 
 #define MIDI_NOTE_ON                   0x90
 #define MIDI_NOTE_OFF                  0x80
@@ -655,7 +658,7 @@ struct NoteEvent : public Event
       , delay(dl)
       , time(tm)
       , partDelay(0)
-      , partTime(1)
+      , partTime(0)
       , partDiv(0)
       , natural(false)
       , endless(false)
@@ -673,7 +676,7 @@ struct NoteEvent : public Event
       volume = (unsigned)-1;
       time = 0;
       delay = 0;
-      partTime = 1;
+      partTime = 0;
       partDelay = 0;
       partDiv = 0;
 
@@ -1372,7 +1375,7 @@ void play(JackEngine *jack, Sequencer &seq)
          {
             if (!e->endless)
             {
-               if (e->time == 0 && e->partDiv == 0)
+               if (e->time == 0 && e->partTime == 0)
                   // If the note does not have specific sound time, turn it off at the next cycle.
                   activeNotes.push_back(e);
                else

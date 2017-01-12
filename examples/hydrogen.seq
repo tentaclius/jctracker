@@ -9,18 +9,18 @@ alias kick     c2.
 alias stick    c#2.
 alias snarejz  d2.
 alias clap     d#2.
-alias tomlow   e2.
-alias closedhh f2!20.
-alias tommid   f#2!30.
-alias pedhh    g2.
-alias tomhi    g#2!30.
-alias snarerk  a2.
-alias openhh   a#2.
-alias cowbell  b2.
-alias ridejz   c3.
-alias crash    c#3.
-alias riderk   d3.
-alias crashjz  d#3.
+alias snarerk  e2.
+alias closedhh f#2!20.
+alias tommid   g2!30.
+alias pedhh    g#2.
+alias tomhi    a2!30.
+alias snarerk  a#2.
+alias openhh   b2.
+alias cowbell  c2.
+alias ridejz   c#3.
+alias crash    d3.
+alias riderk   d#3.
+alias crashjz  e3.
 
 ----- 8/4
 loop
