@@ -1118,13 +1118,13 @@ class Parser
                if (chunk.length() == 0 || chunk[0] == ';')
                   return eventList;
 
-               // If a grouping. TODO: rewrite with C++11.
-               if (chunk[0] == '(')
+               // If a grouping.
+               if (chunk.front() == '(')
                {
                   bGrouped = true;
                   chunk = chunk.substr(1);
                }
-               else if (chunk[chunk.length() - 1] == ')')
+               else if (chunk.back() == ')')
                {
                   bGrouped = false;
                   chunk = chunk.substr(0, chunk.length() - 1);
@@ -1323,23 +1323,19 @@ void play(JackEngine *jack, Sequencer &seq)
          activeNotes.pop_front();
 
          // Check if we have a pedal event in this iteration for the previous note.
-         // TODO: rewrite in C++11.
-         bool bNotePedaled = false;
-         for (std::vector<Event*>::iterator it = eventVec.begin(); it != eventVec.end(); it ++)
+         if (find_if(eventVec.begin(), eventVec.end(),
+                  [&n](Event *e) -> bool {
+                     PedalEvent *p = dynamic_cast<PedalEvent*>(e);
+                     return p && (p->column == n->column); })
+               != eventVec.end())
          {
-            PedalEvent *p = dynamic_cast<PedalEvent*>(*it);
-            if (p && (p->column == n->column))
-            {
-               bNotePedaled = true;
-               break;
-            }
-         }
-
-         if (bNotePedaled)
             nextActive.push_back(n);
+         }
          else
+         {
             gJack.queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1 - n->column,
                   seq.getPortMap(n->column).channel, seq.getPortMap(n->column).port);
+         }
       }
       activeNotes = nextActive;
 
