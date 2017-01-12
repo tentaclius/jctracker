@@ -76,11 +76,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [ ] MIDI control messages.
 // [ ] Transposition separately for each column.
 // [v] Modifiers to work for aliases.
+// [ ] Add deliberate NOTE_END pattern.
 // [ ] Unicode sharp/flat/natural signs.
 // [ ] Jack transport.
-// [ ] Automation channel.
-// [ ] MIDI control messages.
 // [ ] OSC controls.
+// [ ] MIDI control messages.
 // [ ] Input MIDI port to record notes from a MIDI keyboard.
 
 #define MIDI_NOTE_ON                   0x90
@@ -1265,7 +1265,7 @@ class Sequencer
 void play(JackEngine *jack, Sequencer &seq)
 {
    // Runtime values.
-   std::list<std::pair<unsigned, unsigned> > activeNotes;
+   std::list<NoteEvent*> activeNotes;
    unsigned tempo = 100;
    unsigned quantz = 4;
 
@@ -1277,7 +1277,7 @@ void play(JackEngine *jack, Sequencer &seq)
    {
       // The list to keep track of notes that should be muted at the next iteration.
       // Replaces activeList at the end of this iter.
-      std::list<std::pair<unsigned, unsigned> > nextActive;
+      std::list<NoteEvent*> nextActive;
 
       // Check if we have a special command.
       {
@@ -1304,16 +1304,16 @@ void play(JackEngine *jack, Sequencer &seq)
       // Silence the previous notes.
       while (!activeNotes.empty())
       {
-         std::pair<unsigned, unsigned> n = activeNotes.front();
+         NoteEvent *n = activeNotes.front();
          activeNotes.pop_front();
 
          // Check if we have a pedal event in this iteration for the previous note.
-         PedalEvent *pedal = dynamic_cast<PedalEvent*>(eventVec[n.second]);
-         if (eventVec.size() > n.second && pedal != NULL)
+         PedalEvent *pedal = dynamic_cast<PedalEvent*>(eventVec[n->column]);
+         if (eventVec.size() > n->column && pedal != NULL)
             nextActive.push_back(n);
          else
-            gJack.queueMidiEvent(MIDI_NOTE_OFF, n.first, 0, currentTime - 1,
-                  seq.getPortMap(n.second).channel, seq.getPortMap(n.second).port);
+            gJack.queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1 - n->column,
+                  seq.getPortMap(n->column).channel, seq.getPortMap(n->column).port);
       }
       activeNotes = nextActive;
 
@@ -1327,26 +1327,20 @@ void play(JackEngine *jack, Sequencer &seq)
             if (!e->endless)
             {
                if (e->time == 0 && e->partTime == 0)
-               {
                   // If the note does not have specific sound time, turn it off at the next cycle.
-                  std::pair<unsigned, unsigned> n;
-                  n.first = e->pitch;                  // pitch;
-                  n.second = column;                   // channel
-                  activeNotes.push_back(n);
-               }
+                  activeNotes.push_back(e);
                else
-               {
                   // If the note has specific time, schedule the off event right now.
                   gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
                         currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay 
                         + gJack.msToNframes(e->time) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime - 2,
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
-               }
             }
 
             // Queue the note on event.
             gJack.queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
-                  currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay,
+                  currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay
+                     + e->column,
                   seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
          }
 
@@ -1359,11 +1353,11 @@ void play(JackEngine *jack, Sequencer &seq)
    // Queue NOTE_OFF for the remaining notes.
    while (!activeNotes.empty() && gPlaying)
    {
-      std::pair<unsigned, unsigned> n = activeNotes.front();
+      NoteEvent *n = activeNotes.front();
       activeNotes.pop_front();
 
-      gJack.queueMidiEvent(MIDI_NOTE_OFF, n.first, 0, currentTime - 1,
-            seq.getPortMap(n.second).channel, seq.getPortMap(n.second).port);
+      gJack.queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1,
+            seq.getPortMap(n->column).channel, seq.getPortMap(n->column).port);
    }
 
    // Wait for all events to be processed.
