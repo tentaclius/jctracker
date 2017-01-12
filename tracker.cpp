@@ -1344,8 +1344,8 @@ void play(JackEngine *jack, Sequencer &seq)
          if (find_if(eventVec.begin(), eventVec.end(),
                   [&n](Event *e) -> bool {
                      PedalEvent *p = dynamic_cast<PedalEvent*>(e);
-                     return p && (p->column == n->column); })
-               != eventVec.end())
+                     return p && (p->column == n->column);
+                  }) != eventVec.end())
          {
             nextActive.push_back(n);
          }
