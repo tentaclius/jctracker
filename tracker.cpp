@@ -776,6 +776,7 @@ struct NoteEvent : public Event
 
             case '/':
                iss >> partDiv;
+               if (partTime == 0) partTime = 1;
                break;
 
             case ':':
