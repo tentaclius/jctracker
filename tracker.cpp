@@ -653,8 +653,8 @@ struct NoteEvent : public Event
       , volume(v)
       , delay(dl)
       , time(tm)
-      , partDelay(0)
-      , partTime(0)
+      , partDelay(1)
+      , partTime(1)
       , natural(false)
       , endless(false)
    {}
@@ -671,7 +671,7 @@ struct NoteEvent : public Event
       volume = (unsigned)-1;
       time = 0;
       delay = 0;
-      partTime = 0;
+      partTime = 1;
       partDelay = 0;
 
       std::istringstream iss (buf);
@@ -1366,21 +1366,23 @@ void play(JackEngine *jack, Sequencer &seq)
          {
             if (!e->endless)
             {
-               if (e->time == 0 && e->partTime == 0)
+               if (e->time == 0 && e->partTime == 1)
                   // If the note does not have specific sound time, turn it off at the next cycle.
                   activeNotes.push_back(e);
                else
                   // If the note has specific time, schedule the off event right now.
                   gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
-                        currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay 
-                        + gJack.msToNframes(e->time) + gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime - 2,
+                        currentTime + gJack.msToNframes(e->delay)
+                        + (e->partDelay != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) / e->partDelay) : 0)
+                        + gJack.msToNframes(e->time) + gJack.msToNframes(60 * 1000 / tempo / quantz) / e->partTime - 2,
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
             }
 
             // Queue the note on event.
             gJack.queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
-                  currentTime + gJack.msToNframes(e->delay) + gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay
-                     + e->column,
+                  currentTime + gJack.msToNframes(e->delay)
+                   + (e->partDelay != 0 ? (gJack.msToNframes(60 * 1000 / tempo /quantz) / e->partDelay) : 0)
+                   + e->column,
                   seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
          }
 
