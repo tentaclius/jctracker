@@ -1,53 +1,53 @@
 ;; G.F. Handel. Menuet.
 
 ;; Default midi port to connect to the synthesizer.
-port 1 3 default 0 zynaddsubfx:midi_input
+port 1 2 default 0 zynaddsubfx:midi_input
 
 ;; Fourth column is for generating click via Hydrogen.
-port 4 metronome 0 hydrogen-midi:RX
+port 3 metronome 0 hydrogen-midi:RX
 
 alias x c#2.
 
 tempo 50
 
 --------- 3/4
-G4    C4    . x  
+G4    C4    x  
 C5    |
 B4    D4
 --------- 6/8
-C5    E4    . x
+C5    E4    x
 D5    |
 E5    |
 |     |
 D5    F4
 |     |
 --------- 3/4
-G4    G4    . x
+G4    G4    x
 |     |
 C5    A4
 --------- 6/8
-D5    B4    . x
+D5    B4    x
 E5    |
 F5    |
 |     |
 |     G4
 |     |
 --------- 6/8
-E5    C4    . x
+E5    C4    x
 |     |
 F5    |
 E5    |
 D5    D4
 C5    |
 ---------
-G5    C4    . x
+G5    C4    x
 |     |
 F5    |
 E5    |
 D5    D4
 C5    |
 ---------
-B4    G4    . x
+B4    G4    x
 C5    |
 C5    E4
 |     |
@@ -55,73 +55,73 @@ C5    E4
 |     |
 
 --------- 3/4
-d5    g     . x
+d5    g     x
 |     .
 .     a
 --------- 
-d5    b     . x
+d5    b     x
 d5    .
 e5    g
 ---------
-c5    a     . x
+c5    a     x
 .     |
 b     g
 ---------
-e5    c5    . x
+e5    c5    x
 f#5   .
 g5    b
 ---------
-f#5   a     . x
+f#5   a     x
 |     d5
 |     c5
 ---------
-g5    b     . x
+g5    b     x
 f#5   .
 e5    c5
 ---------
-d5    b     . x
+d5    b     x
 c5    a
 b     g
 ---------
-c5    c     . x
+c5    c     x
 a     d
 |     |
 ---------
-g     g     . x
+g     g     x
 |     |
 |     |
 
 loop 2
 ---------
-.     g     . x
+.     g     x
 b     |
 d5    |
 ---------
-f5    g     . x
+f5    g     x
 d5    |
 b     |
 ---------
-g     g     . x
+g     g     x
 |     |
 f5    b
 ---------
-e5    c5    . x
+e5    c5    x
 |     g
 |     c
 ---------
-a5    f     . x
+a5    f     x
 |     |
 g5    e
 ---------
-f5/.5 e5\.5/.5    d    x
+(f5/.5 e5\.5/.5)  d    x
 d5                e  
 c5                f
 ----------
-.     g     . x
+.     g     x
 c5    |
 b     g
 ---------
-c5    c4    . x
+c5    c4    x
 |     |
 |     |
 

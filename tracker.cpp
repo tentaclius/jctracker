@@ -934,6 +934,7 @@ class Parser
          delete mSigns;
       }
 
+      /***************************************************/
       // Parse a given line (with one or multiple directives or patterns).
       std::vector<Event*> parseLine(std::string line)
       {
@@ -947,7 +948,7 @@ class Parser
             return eventList;
 
          // A bar; find a number to identify the new size
-         if (chunk[0] == '-')
+         if (line[0] == '-')
          {
             BarEvent *b;
             unsigned i = 1;
