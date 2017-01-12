@@ -903,6 +903,18 @@ class Parser
    int mTranspose;
    size_t mLinePos;
 
+   private:
+      std::string trim(std::string s)
+      {
+         unsigned a = 0, b = s.length() - 1;
+
+         while (a < b && s[a] == ' ') a ++;
+         while (a < b && s[b] == ' ') b --;
+
+         if (a == b) return "";
+         else return s.substr(a, b - a + 1);
+      }
+
    public:
       // Create the parser.
       Parser(size_t chan = 64)
@@ -1061,8 +1073,13 @@ class Parser
                mColumnMap[i - 1] = PortMap(channel, port);
 
             // Try to link to the destination port.
+            char c;
             iss.clear();
-            if (iss >> connClient)
+            while ((c = iss.get()) != EOF)
+               connClient += c;
+            connClient = trim(connClient);
+
+            if (!connClient.empty())
                if (gJack.connectPort(port, connClient) != 0)
                   std::cerr << "WARNING! Can not connect to client " << connClient << std::endl;
 
