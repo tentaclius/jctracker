@@ -72,6 +72,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [v] Note length and timing in parts of current note length.
 // [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
 // [-] Pattern file management: load, unload, reload of multiple patterns.
+// [ ] Allow several notes for the channel.
+// [ ] MIDI control messages.
 // [ ] Transposition separately for each column.
 // [v] Modifiers to work for aliases.
 // [ ] Unicode sharp/flat/natural signs.
@@ -894,6 +896,12 @@ class Parser
    std::map<std::string, std::string> mAliases;
    std::vector<PortMap> mColumnMap;
    int mTranspose;
+
+   private:
+      std::string parseWord(std::string line)
+      {
+         /* Skip whitespaces. */
+      }
 
    public:
       // Create the parser.
