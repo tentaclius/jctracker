@@ -70,17 +70,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // [v] Automatic connection.
 // [v] Move the patterns and the player into separate classes.
 // [v] Note length and timing in parts of current note length.
+// [v] Modifiers to work for aliases.
 // [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
 // [-] Pattern file management: load, unload, reload of multiple patterns.
-// [ ] Allow several notes for the channel.
+// [v] Allow several notes for the channel.
 // [ ] MIDI control messages.
-// [ ] Transposition separately for each column.
-// [v] Modifiers to work for aliases.
-// [ ] Add deliberate NOTE_END pattern.
-// [ ] Unicode sharp/flat/natural signs.
-// [ ] Jack transport.
 // [ ] OSC controls.
-// [ ] MIDI control messages.
+// [ ] Transposition separately for each column.
+// [ ] Unicode sharp/flat/natural signs.
+// [ ] Add deliberate NOTE_END pattern.
+// [ ] Jack transport.
 // [ ] Input MIDI port to record notes from a MIDI keyboard.
 
 #define MIDI_NOTE_ON                   0x90
@@ -838,6 +837,12 @@ struct TempoEvent : public Event
 /* The previous note will not be muted. */
 struct PedalEvent : public Event
 {
+   unsigned column;     // The internal channel number.
+   PedalEvent(unsigned c)
+   {
+      column = c;
+   }
+
    ~PedalEvent() {}
 };
 
@@ -896,12 +901,7 @@ class Parser
    std::map<std::string, std::string> mAliases;
    std::vector<PortMap> mColumnMap;
    int mTranspose;
-
-   private:
-      std::string parseWord(std::string line)
-      {
-         /* Skip whitespaces. */
-      }
+   size_t mLinePos;
 
    public:
       // Create the parser.
@@ -913,6 +913,7 @@ class Parser
          mDfltNote.set(0,0,0,0);
          mTranspose = 0;
          mVolume = 64;
+         mLinePos = 0;
       }
 
       ~Parser()
@@ -924,17 +925,17 @@ class Parser
       // Parse a given line (with one or multiple directives or patterns).
       std::vector<Event*> parseLine(std::string line)
       {
+         mLinePos = 0;
          std::string chunk;          // A piece of the line to read the command.
          std::istringstream iss (line);
          std::vector<Event*> eventList;
-         //eventList.reserve(channelNum);
 
          // Return the empty list if the line is empty.
          if (line.length() == 0)
             return eventList;
 
          // A bar; find a number to identify the new size
-         if (line[0] == '-')
+         if (chunk[0] == '-')
          {
             BarEvent *b;
             unsigned i = 1;
@@ -1105,6 +1106,7 @@ class Parser
          }
 
          // If nothing else, try to parse as a note
+         bool bGrouped = false;
          unsigned column = 0;
          iss.seekg(0);
          iss.clear();
@@ -1115,6 +1117,18 @@ class Parser
                // Comment line.
                if (chunk.length() == 0 || chunk[0] == ';')
                   return eventList;
+
+               // If a grouping. TODO: rewrite with C++11.
+               if (chunk[0] == '(')
+               {
+                  bGrouped = true;
+                  chunk = chunk.substr(1);
+               }
+               else if (chunk[chunk.length() - 1] == ')')
+               {
+                  bGrouped = false;
+                  chunk = chunk.substr(0, chunk.length() - 1);
+               }
 
                // An aliased name.
                size_t terminalPosition = chunk.find_first_of("!%@/\\#.");
@@ -1128,7 +1142,7 @@ class Parser
 
                // Continuing the previous note.
                else if (chunk == "|")
-                  eventList.push_back(new PedalEvent());
+                  eventList.push_back(new PedalEvent(column));
 
                // Default note.
                else if (chunk == "*")
@@ -1162,7 +1176,8 @@ class Parser
             {
                throw (int) iss.tellg();
             }
-            column ++;
+            if (!bGrouped)
+               column ++;
          }
 
          return eventList;
@@ -1308,8 +1323,19 @@ void play(JackEngine *jack, Sequencer &seq)
          activeNotes.pop_front();
 
          // Check if we have a pedal event in this iteration for the previous note.
-         PedalEvent *pedal = dynamic_cast<PedalEvent*>(eventVec[n->column]);
-         if (eventVec.size() > n->column && pedal != NULL)
+         // TODO: rewrite in C++11.
+         bool bNotePedaled = false;
+         for (std::vector<Event*>::iterator it = eventVec.begin(); it != eventVec.end(); it ++)
+         {
+            PedalEvent *p = dynamic_cast<PedalEvent*>(*it);
+            if (p && (p->column == n->column))
+            {
+               bNotePedaled = true;
+               break;
+            }
+         }
+
+         if (bNotePedaled)
             nextActive.push_back(n);
          else
             gJack.queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1 - n->column,

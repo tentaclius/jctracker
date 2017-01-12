@@ -37,7 +37,7 @@ C        ; Start the note...
 |        ; ... and keep playing it while the "|" sign appears in the pattern.
 |        ; ...
 
-; Controlling directives.
+;; Controlling directives.
 default C#4    ; Set the default note (directive are case sensitive).
 volume 50      ; Set the default volume for the notes (0..64).
 transpose 10   ; Transpose the notes.
@@ -83,3 +83,6 @@ port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
                ; the output channel named "output_to_zyn".
                ; The program will make an attempt to connect to the input port
                ; of "zynaddsubfx", input port midi_in, channel 0.
+
+;; Note groups
+(A B) C        ; Notes A and B will be sent to the channel associated with the first column. C to second column.
