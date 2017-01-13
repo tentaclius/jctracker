@@ -55,11 +55,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
  [-] Pattern file management: load, unload, reload of multiple patterns.
  [v] Allow several notes for the channel.
- [ ] MIDI control messages.
- [ ] Legato.
- [ ] OSC controls.
+ [v] MIDI control messages.
+ [ ] sleep/pause command.
  [ ] Better parsing error messages (with highlighting the error position).
+ [ ] OSC controls.
  [ ] 'define' full pattern.
+ [ ] Ligato.
  [ ] Transposition separately for each column.
  [ ] Unicode sharp/flat/natural signs.
  [ ] Add deliberate NOTE_END pattern.
@@ -978,12 +979,14 @@ class Parser
    size_t mLinePos;
 
    private:
+      /***************************************************/
+      /* Remove spaces at the beginning and the end of the string */
       std::string trim(std::string s)
       {
          unsigned a = 0, b = s.length() - 1;
 
-         while (a < b && s[a] == ' ') a ++;
-         while (a < b && s[b] == ' ') b --;
+         while (a < b && isblank(s[a])) a ++;
+         while (a < b && isblank(s[b])) b --;
 
          if (a == b) return "";
          else return s.substr(a, b - a + 1);
