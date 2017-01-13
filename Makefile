@@ -1,7 +1,7 @@
 BIN  = jctracker
 LIBS = -ljack -lpthread -lm
-OPTS_DEV = -Wall -g -DDEBUG -std=c++11
-OPTS = -Wall -std=c++11
+OPTS_DEV = -Wall -std=c++11 -g -DDEBUG
+OPTS =     -Wall -std=c++11
 
 $(BIN): tracker.cpp Makefile
 	$(CXX) tracker.cpp -o $@ $(LIBS) $(OPTS) 
