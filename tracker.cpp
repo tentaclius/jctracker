@@ -842,9 +842,9 @@ struct MidiCtlEvent : public Event
       delayDiv = 1;
    }
 
-   MidiCtlEvent(const std::string &str, unsigned column = 0)
+   MidiCtlEvent(const std::string &str, unsigned clmn = 0)
    {
-      column = 0;
+      column = clmn;
       controller = 0;
       value = 0;
       delay = 0;
@@ -1426,7 +1426,7 @@ void play(JackEngine *jack, Sequencer &seq)
       // Start new notes.
       for (std::vector<Event*>::iterator jt = eventVec.begin(); jt != eventVec.end(); jt ++)
       {
-         unsigned stopChannel = UINT_MAX;
+         unsigned stopChannel = (unsigned)-1;
          std::list<NoteEvent*> nextActives;
 
          {
@@ -1484,7 +1484,7 @@ void play(JackEngine *jack, Sequencer &seq)
             }
          }
          
-         if (stopChannel != UINT_MAX)
+         if (stopChannel != (unsigned)-1)
          {
             // Resize the channel vector if needed.
             if (stopChannel >= activeNotesVec.size())
