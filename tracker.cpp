@@ -551,10 +551,10 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
    }
 
    // Read the data from the ringbuffer.
-   while (jack_ringbuffer_read_space(gJack.mRingbuffer) >= sizeof(MidiMessage))
+   while (jack_ringbuffer_read_space(jack->mRingbuffer) >= sizeof(MidiMessage))
    {
       MidiMessage midiData;
-      if (jack_ringbuffer_peek(gJack.mRingbuffer, (char*)&midiData, sizeof(MidiMessage)) != sizeof(MidiMessage))
+      if (jack_ringbuffer_peek(jack->mRingbuffer, (char*)&midiData, sizeof(MidiMessage)) != sizeof(MidiMessage))
       {
          std::cerr << "WARNING! Incomplete MIDI message read." << std::endl;
          continue;
@@ -564,7 +564,7 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
       if (t >= (int)nframes)
          break;
 
-      jack_ringbuffer_read_advance(gJack.mRingbuffer, sizeof(MidiMessage));
+      jack_ringbuffer_read_advance(jack->mRingbuffer, sizeof(MidiMessage));
 
       if (t < 0)
          t = 0;
@@ -739,7 +739,7 @@ struct NoteEvent : public Event
          iss.get();
          pitch ++;
       }
-      if (iss.peek() == 'b')
+      if (iss.peek() == 'b' || iss.peek() == '&')
       {
          iss.get();
          pitch --;
@@ -1057,7 +1057,7 @@ class Parser
 
                if (chunk[0] == '#')
                   mod = +1;
-               else if (chunk[0] == 'b')
+               else if (chunk[0] == 'b' || chunk[0] == '&')
                   mod = -1;
                else if (chunk[0] == 'n')
                   mod = 0;
@@ -1430,6 +1430,7 @@ void play(JackEngine *jack, Sequencer &seq)
          std::list<NoteEvent*> nextActives;
 
          {
+            // A regular note.
             NoteEvent *e = dynamic_cast<NoteEvent*>(*jt);
             if (e != NULL)
             {
@@ -1461,6 +1462,7 @@ void play(JackEngine *jack, Sequencer &seq)
          }
 
          {
+            // Midi control.
             MidiCtlEvent *e = dynamic_cast<MidiCtlEvent*>(*jt);
             if (e != NULL)
             {
@@ -1474,6 +1476,7 @@ void play(JackEngine *jack, Sequencer &seq)
          }
 
          {
+            // Skip a bit. Silence the previous notes.
             SkipEvent *e = dynamic_cast<SkipEvent*>(*jt);
             if (e != NULL)
             {

@@ -18,6 +18,7 @@ C        ; The note C of default (fourth) octave.
 c        ; The same note; parser is case insensitive to notes.
 C#       ; C sharp.
 Bb       ; B flat.
+B&       ; Another way of saying B-flat.
 A#7      ; A shart of 7th octave.
 
 C!40     ; Specify the velocity of the note (0..64).
@@ -27,8 +28,10 @@ C%20@200!64    ; All modifiers together. The order does not matter.
 c/2      ; 1/2 of the note length.
 c:4+1/2  ; Note plyaing time is 4/2, start delay is 1/2 of the current note size.
          ; If both "@" and ":" delays are given, the delaying time is the sum of the two.
+         ; All time modifiers can be real numbers.
 
 C E G    ; Play several notes simultaneously.
+(C E) G  ; Group first two notes, so both events associated with the first column.
 
 .        ; Skip a turn. A silent note.
 *        ; Play a default note. The default note is set by "default" command.
@@ -38,6 +41,16 @@ C        ; Start the note...
 |        ; ... and keep playing it while the "|" sign appears in the pattern.
 |        ; ...
 
+;; Full note format:
+; <NoteName> [(#|b|&|n)] [<OctaveNumber>] [<Modifiers>]
+;   where <Modifiers> contain one or several of the following (order is not important):
+; !<IntegerNumber>      ; set the note's velocity;
+; %<RealNumber>         ; delay the note for specified number of microseconds;
+; @<RealNumber>         ; note playing time in microseconds;
+; :<RealNumber>         ; note playing time in current note size parts;
+; +<RealNumber>         ; delay the note in current note size parts;
+; /<RealNumber>         ; specify the parts devisor for "+" and ":" modifiers.
+
 ;; Controlling directives.
 default C#4    ; Set the default note (directive are case sensitive).
 volume 50      ; Set the default volume for the notes (0..64).
@@ -45,15 +58,19 @@ transpose 10   ; Transpose the notes.
 tempo 120      ; Set the playing speed in BPM.
 
 loop 4         ; Play the block for n times.
-; ...          ; If the number of repititions is not specified, the loop will go forever.
+c e g          ; If the number of repititions is not specified, the loop will go forever.
+d f a
+| | |
+. . .          
 endloop
 
+;; Bar separator.
 -------        ; Visual bar separator. The number of '-' signs does not matter.
 ----- 3/4      ; You can set the quantization for the following blocks.
                ; Currently only the nominator is important. It defines how many notes will fit into the next cycle.
-
 --- 4/4 #C     ; Specify the size and default signs.
 --- #A bB nC   ; A-shart, B-flat, natural C.
+Bn             ; "n" suffix to play natural tone.
 
 alias drum C#2 ; Create an alias for the note.
 
@@ -88,4 +105,8 @@ port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
 ;; Note groups
 (A B) C        ; Notes A and B will be sent to the channel associated with the first column. C to second column.
 
+;; MIDI controllers
+; $<ControllerNumber>=<IntegerValue[0..127]>
 $4=100         ; Send the value 100 to the MIDI controller #4.
+(C $4=100)     ; MIDI controls can be grouped with the notes and are being sent to the corresponding channel.
+
