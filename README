@@ -87,3 +87,5 @@ port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
 
 ;; Note groups
 (A B) C        ; Notes A and B will be sent to the channel associated with the first column. C to second column.
+
+$4=100         ; Send the value 100 to the MIDI controller #4.

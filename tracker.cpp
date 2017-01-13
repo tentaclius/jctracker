@@ -58,6 +58,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [ ] MIDI control messages.
  [ ] Legato.
  [ ] OSC controls.
+ [ ] Better parsing error messages (with highlighting the error position).
+ [ ] 'define' full pattern.
  [ ] Transposition separately for each column.
  [ ] Unicode sharp/flat/natural signs.
  [ ] Add deliberate NOTE_END pattern.
@@ -85,6 +87,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <jack/midiport.h>
 #include <jack/ringbuffer.h>
 
+
 #define MIDI_NOTE_ON                   0x90
 #define MIDI_NOTE_OFF                  0x80
 #define MIDI_PROGRAM_CHANGE            0xC0
@@ -96,6 +99,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MIDI_ALL_NOTES_OFF             123
 #define MIDI_BANK_SELECT_MSB           0
 #define MIDI_BANK_SELECT_LSB           32
+
 
 typedef jack_default_audio_sample_t sample_t;
 
@@ -593,7 +597,7 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
       }
       memcpy(buffer, midiData.data, midiData.len);
 
-      trace("jack_process_cb: midi(%x,%x,%x,%d) t=%d\n", midiData.data[0], midiData.data[1], midiData.data[2], midiData.time, t);
+      trace("jack_process_cb: midi(%x,%x,%x,%llu) t=%d\n", midiData.data[0], midiData.data[1], midiData.data[2], midiData.time, t);
    }
 
    return 0;      
@@ -666,8 +670,9 @@ struct NoteEvent : public Event
 
    NoteEvent() { NoteEvent(0,64,0,0,0); }
 
-   // Constructor that parses the note from the string.
-   NoteEvent(const std::string &buf)
+   /***************************************************/
+   /* Constructor that parses the note from the string. */
+   NoteEvent(const std::string &buf, unsigned column = 0)
    {
       const int octaveLen = 12;
       natural = false;
@@ -685,7 +690,7 @@ struct NoteEvent : public Event
       if (buf.length() == 0)
          throw 0;
 
-      // The note
+      // The note.
       switch (iss.get())
       {
          case 'C':
@@ -796,7 +801,8 @@ struct NoteEvent : public Event
       }
    }
 
-   // Set the parameters of the current midi message.
+   /***************************************************/
+   /* Set the parameters of the current midi message. */
    void set(unsigned n, unsigned v, uint64_t tm, uint64_t dl)
    {
       pitch = n;
@@ -805,12 +811,65 @@ struct NoteEvent : public Event
       delay = dl;
    }
 
+   /***************************************************/
    ~NoteEvent() {}
 
-   // Return a new instance of the same data.
+   /***************************************************/
+   /* Return a new instance of the same data. */
    NoteEvent* clone()
    {
       return new NoteEvent(pitch, volume, time, delay, column);
+   }
+};
+
+/*******************************************************************************************/
+/* A message to a midi controller. */
+struct MidiCtlEvent : public Event
+{
+   unsigned column;
+   unsigned controller;
+   unsigned value;
+   double delay;
+   double delayDiv;
+
+   MidiCtlEvent()
+   {
+      column = 0;
+      controller = 0;
+      value = 0;
+      delay = 0;
+      delayDiv = 1;
+   }
+
+   MidiCtlEvent(const std::string &str, unsigned column = 0)
+   {
+      column = 0;
+      controller = 0;
+      value = 0;
+      delay = 0;
+      delayDiv = 1;
+
+      if (str.front() != '$')
+         throw 0;
+
+      std::istringstream iss (str.substr(1));
+
+      if (!(iss >> controller) || iss.get() != '=' || !(iss >> value))
+         throw iss.tellg();
+
+      char c;
+      while ((c = iss.get()) != EOF)
+      {
+         switch (c)
+         {
+            case '/':
+               iss >> delayDiv;
+               break;
+            case ':':
+               iss >> delay;
+               break;
+         }
+      }
    }
 };
 
@@ -926,7 +985,8 @@ class Parser
       }
 
    public:
-      // Create the parser.
+      /***************************************************/
+      /* Create the parser. */
       Parser(size_t chan = 64)
       {
          mSigns = new std::vector<int>(12, 0);
@@ -938,6 +998,7 @@ class Parser
          mLinePos = 0;
       }
 
+      /***************************************************/
       ~Parser()
       {
          delete mLastNote;
@@ -945,7 +1006,7 @@ class Parser
       }
 
       /***************************************************/
-      // Parse a given line (with one or multiple directives or patterns).
+      /* Parse a given line (with one or multiple directives or patterns). */
       std::vector<Event*> parseLine(std::string line)
       {
          mLinePos = 0;
@@ -1097,7 +1158,7 @@ class Parser
             return eventList;
          }
 
-         // New alias.
+         // Learn a new alias.
          if (chunk == "alias")
          {
             std::string alias, replacement;
@@ -1179,6 +1240,16 @@ class Parser
                // Previous note.
                else if (chunk == "^")
                   eventList.push_back(mLastNote->at(column).clone());
+
+               // A MIDI control message.
+               else if (chunk.front() == '$')
+               {
+                  try {
+                     eventList.push_back(new MidiCtlEvent(chunk, column));
+                  } catch (int e) {
+                     throw e + iss.tellg();
+                  }
+               }
 
                // And finally this must be a real note:
                else
@@ -1368,7 +1439,6 @@ void play(JackEngine *jack, Sequencer &seq)
       activeNotes = nextActive;
 
       // Start new notes.
-      unsigned column = 0;
       for (std::vector<Event*>::iterator jt = eventVec.begin(); jt != eventVec.end(); jt ++)
       {
          NoteEvent *e = dynamic_cast<NoteEvent*>(*jt);
@@ -1397,7 +1467,14 @@ void play(JackEngine *jack, Sequencer &seq)
                   seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
          }
 
-         column ++;
+         MidiCtlEvent *c = dynamic_cast<MidiCtlEvent*>(*jt);
+         if (c != NULL)
+         {
+            // This is a control message to the midi.
+            gJack.queueMidiEvent(MIDI_CONTROLLER, c->controller, c->value,
+                  currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * c->delay / c->delayDiv),
+                  seq.getPortMap(c->column).channel, seq.getPortMap(c->column).port);
+         }
       }
 
       currentTime += gJack.msToNframes(60 * 1000 / tempo / quantz);
