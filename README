@@ -31,6 +31,7 @@ c:4+1/2  ; Note plyaing time is 4/2, start delay is 1/2 of the current note size
          ; All time modifiers can be real numbers.
 
 C E G    ; Play several notes simultaneously.
+         ; There are three columns, you can manage what port/channel each column belongs to by using "port" (see below).
 (C E) G  ; Group first two notes, so both events associated with the first column.
 
 .        ; Skip a turn. A silent note.
