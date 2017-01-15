@@ -1455,9 +1455,9 @@ void play(JackEngine *jack, Sequencer &seq)
                stopChannel = e->column;
 
                // Queue the note on event.
-               gJack.queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
-                     currentTime + gJack.msToNframes(e->delay)
-                      + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay / e->partDiv) : 0)
+               jack->queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
+                     currentTime + jack->msToNframes(e->delay)
+                      + (e->partDiv != 0 ? (jack->msToNframes(60 * 1000 / tempo /quantz) * e->partDelay / e->partDiv) : 0)
                       + e->column,
                      seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
 
@@ -1468,11 +1468,11 @@ void play(JackEngine *jack, Sequencer &seq)
                      nextActives.push_back(e);
                   else
                      // If the note has specific time, schedule the off event right now.
-                     gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
-                           currentTime + gJack.msToNframes(e->delay)
-                            + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay / e->partDiv) : 0)
-                            + gJack.msToNframes(e->time)
-                            + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime / e->partDiv) : 0) - 2,
+                     jack->queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
+                           currentTime + jack->msToNframes(e->delay)
+                            + (e->partDiv != 0 ? (jack->msToNframes(60 * 1000 / tempo / quantz) * e->partDelay / e->partDiv) : 0)
+                            + jack->msToNframes(e->time)
+                            + (e->partDiv != 0 ? (jack->msToNframes(60 * 1000 / tempo / quantz) * e->partTime / e->partDiv) : 0) - 2,
                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                }
             }
@@ -1488,24 +1488,24 @@ void play(JackEngine *jack, Sequencer &seq)
                if (e->valueB == (unsigned)-1 || e->time == 0 || e->value == e->valueB)
                {
                   // This is a control message to the midi. Generate single event.
-                  gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
-                        currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
+                  jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
+                        currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                }
                else
                {
                   // This is ramp. Need to generate a bunch of messages.
-                  unsigned timeStep = (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->time / e->delayDiv)
+                  unsigned timeStep = (jack->msToNframes(60 * 1000 / tempo / quantz) * e->time / e->delayDiv)
                                        / abs((int)e->valueB - e->value);
                   for (unsigned i = e->value; i != e->valueB; i += (e->valueB > e->value ? 1 : -1))
                   {
-                     gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
-                           currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
+                     jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
+                           currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                              + timeStep * abs((int)e->value - i),
                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                   }
-                  gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, e->valueB,
-                        currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
+                  jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->valueB,
+                        currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                         + timeStep * abs((int)e->value - e->valueB),
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                }
@@ -1541,7 +1541,7 @@ void play(JackEngine *jack, Sequencer &seq)
          }
       }
 
-      currentTime += gJack.msToNframes(60 * 1000 / tempo / quantz);
+      currentTime += jack->msToNframes(60 * 1000 / tempo / quantz);
    }  // End of the main loop.
 
    // Queue NOTE_OFF for the remaining notes.
@@ -1553,13 +1553,13 @@ void play(JackEngine *jack, Sequencer &seq)
          NoteEvent *n = (*it).front();
          (*it).pop_front();
 
-         gJack.queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1,
+         jack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1,
                seq.getPortMap(n->column).channel, seq.getPortMap(n->column).port);
       }
    }
 
    // Wait for all events to be processed.
-   while (gJack.hasPendingEvents() & gPlaying)
+   while (jack->hasPendingEvents() & gPlaying)
       usleep(200000);
    usleep(200000);
 
