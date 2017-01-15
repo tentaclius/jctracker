@@ -43,7 +43,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] Separate threads for different tasks.
  [v] Implement bar event and sizes support and tempo changes.
  [v] Transposition ("transpose 20")..
- [v] Initial signs (bemol/dies) applied to all notes.
+ [v] Initial signs (sharp/flat) applied to all notes.
  [v] Aliases for the notes with _hash_tables_!
  [v] Proper time management.
  [v] Make the transposition static.
@@ -55,6 +55,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
  [v] Allow several notes for the channel.
  [v] MIDI control messages.
+ [v] MIDI control ramp. $4=1..100:3/2
  [ ] Pattern file management: load, unload, reload of multiple patterns.
  [ ] sleep/pause command.
  [ ] Better error messages for the parser (with highlighting the error position).
@@ -83,6 +84,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
+#include <math.h>
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
@@ -399,7 +401,7 @@ class JackEngine
          jack_status_t  status;
 
          // Midi event heap.
-         mMidiHeap = new MidiHeap(256);
+         mMidiHeap = new MidiHeap(1024);
 
          // Create the ringbuffer.
          mRingbuffer = jack_ringbuffer_create(1024 * sizeof(MidiMessage));
@@ -598,7 +600,8 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
       }
       memcpy(buffer, midiData.data, midiData.len);
 
-      trace("jack_process_cb: midi(%x,%x,%x,%llu) t=%d\n", midiData.data[0], midiData.data[1], midiData.data[2], midiData.time, t);
+      trace("jack_process_cb: midi(%x,%x,%x) t=%llu\n", midiData.data[0], midiData.data[1], midiData.data[2],
+            (long long unsigned)midiData.time);
    }
 
    return 0;      
@@ -664,7 +667,7 @@ struct NoteEvent : public Event
       , time(tm)
       , partDelay(0)
       , partTime(0)
-      , partDiv(0)
+      , partDiv(1)
       , natural(false)
       , endless(false)
    {}
@@ -684,7 +687,7 @@ struct NoteEvent : public Event
       delay = 0;
       partTime = 0;
       partDelay = 0;
-      partDiv = 0;
+      partDiv = 1;
 
       std::istringstream iss (buf);
 
@@ -782,7 +785,6 @@ struct NoteEvent : public Event
 
             case '/':
                iss >> partDiv;
-               if (partTime == 0) partTime = 1;
                break;
 
             case ':':
@@ -830,6 +832,8 @@ struct MidiCtlEvent : public Event
    unsigned column;
    unsigned controller;
    unsigned value;
+   unsigned valueB;
+   double time;
    double delay;
    double delayDiv;
 
@@ -849,6 +853,8 @@ struct MidiCtlEvent : public Event
       column = clmn;
       controller = 0;
       value = 0;
+      valueB = (unsigned)-1;
+      time = 0;
       delay = 0;
       delayDiv = 1;
 
@@ -860,16 +866,24 @@ struct MidiCtlEvent : public Event
       if (!(iss >> controller) || iss.get() != '=' || !(iss >> value))
          throw iss.tellg();
 
+      while (iss.peek() == '.')
+         iss.get();
+
+      iss >> valueB;
+
       char c;
       while ((c = iss.get()) != EOF)
       {
          switch (c)
          {
+            case ':':
+               iss >> time;
+               break;
+            case '+':
+               iss >> delay;
+               break;
             case '/':
                iss >> delayDiv;
-               break;
-            case ':':
-               iss >> delay;
                break;
          }
       }
@@ -1419,6 +1433,7 @@ void play(JackEngine *jack, Sequencer &seq)
          BarEvent *e = dynamic_cast<BarEvent*>(eventVec.front());
          if (e != NULL)
          {
+            trace("bar\n");
             if (e->nom > 0)
                quantz = e->nom;
             continue;
@@ -1442,8 +1457,8 @@ void play(JackEngine *jack, Sequencer &seq)
                // Queue the note on event.
                gJack.queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
                      currentTime + gJack.msToNframes(e->delay)
-                     + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay / e->partDiv) : 0)
-                     + e->column,
+                      + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo /quantz) * e->partDelay / e->partDiv) : 0)
+                      + e->column,
                      seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
 
                if (!e->endless)
@@ -1455,9 +1470,9 @@ void play(JackEngine *jack, Sequencer &seq)
                      // If the note has specific time, schedule the off event right now.
                      gJack.queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
                            currentTime + gJack.msToNframes(e->delay)
-                           + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay / e->partDiv) : 0)
-                           + gJack.msToNframes(e->time)
-                           + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime / e->partDiv) : 0) - 2,
+                            + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partDelay / e->partDiv) : 0)
+                            + gJack.msToNframes(e->time)
+                            + (e->partDiv != 0 ? (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->partTime / e->partDiv) : 0) - 2,
                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                }
             }
@@ -1470,10 +1485,30 @@ void play(JackEngine *jack, Sequencer &seq)
             {
                stopChannel = e->column;
 
-               // This is a control message to the midi.
-               gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
-                     currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
-                     seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+               if (e->valueB == (unsigned)-1 || e->time == 0 || e->value == e->valueB)
+               {
+                  // This is a control message to the midi. Generate single event.
+                  gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
+                        currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
+                        seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+               }
+               else
+               {
+                  // This is ramp. Need to generate a bunch of messages.
+                  unsigned timeStep = (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->time / e->delayDiv)
+                                       / abs((int)e->valueB - e->value);
+                  for (unsigned i = e->value; i != e->valueB; i += (e->valueB > e->value ? 1 : -1))
+                  {
+                     gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
+                           currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
+                             + timeStep * abs((int)e->value - i),
+                           seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+                  }
+                  gJack.queueMidiEvent(MIDI_CONTROLLER, e->controller, e->valueB,
+                        currentTime + (gJack.msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
+                        + timeStep * abs((int)e->value - e->valueB),
+                        seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+               }
             }
          }
 
@@ -1486,6 +1521,7 @@ void play(JackEngine *jack, Sequencer &seq)
             }
          }
          
+         // Stop previous note on this channel. TODO: if a pattern is empty the note does not get silenced.
          if (stopChannel != (unsigned)-1)
          {
             // Resize the channel vector if needed.
@@ -1567,7 +1603,7 @@ int main(int argc, char **argv)
 
    // Shutdown the client and exit.
    gJack.stopSounds();
-   sleep(1);
+   usleep(200000);
 
    gJack.shutdown();
 

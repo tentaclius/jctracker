@@ -25,7 +25,7 @@ C!40     ; Specify the velocity of the note (0..64).
 C%20     ; Delay before the note plays in microseconds.
 C@100    ; Note playing time in microseconds.
 C%20@200!64    ; All modifiers together. The order does not matter.
-c/2      ; 1/2 of the note length.
+c:1/2    ; 1/2 of the note length.
 c:4+1/2  ; Note plyaing time is 4/2, start delay is 1/2 of the current note size.
          ; If both "@" and ":" delays are given, the delaying time is the sum of the two.
          ; All time modifiers can be real numbers.
@@ -108,7 +108,7 @@ port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
 (A B) C        ; Notes A and B will be sent to the channel associated with the first column. C to second column.
 
 ;; MIDI controllers
-; $<ControllerNumber>=<IntegerValue[0..127]>
+; $<ControllerNumber>=<IntegerValue 0..127>[..<FinalValue>:<Time>[/<Factor>]]
 $4=100         ; Send the value 100 to the MIDI controller #4.
 (C $4=100)     ; MIDI controls can be grouped with the notes and are being sent to the corresponding channel.
-
+$7=0..127:3/2  ; Create a ramp of MIDI control messages. Change from 0 to 127 within 3/2 of current note time.
