@@ -53,11 +53,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] Note length and timing in parts of current note length.
  [v] Modifiers to work for aliases.
  [-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
- [-] Pattern file management: load, unload, reload of multiple patterns.
  [v] Allow several notes for the channel.
  [v] MIDI control messages.
+ [ ] Pattern file management: load, unload, reload of multiple patterns.
  [ ] sleep/pause command.
- [ ] Better parsing error messages (with highlighting the error position).
+ [ ] Better error messages for the parser (with highlighting the error position).
  [ ] OSC controls.
  [ ] 'define' full pattern.
  [ ] Ligato.
@@ -842,6 +842,8 @@ struct MidiCtlEvent : public Event
       delayDiv = 1;
    }
 
+   /*****************************************************************************************************/
+   /* Construct the control by parsing the string. */
    MidiCtlEvent(const std::string &str, unsigned clmn = 0)
    {
       column = clmn;
