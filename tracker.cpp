@@ -104,6 +104,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MIDI_BANK_SELECT_MSB           0
 #define MIDI_BANK_SELECT_LSB           32
 
+#define MIDI_HEAP_SIZE                 1024
+#define RINGBUFFER_SIZE                1024
 
 typedef jack_default_audio_sample_t sample_t;
 
@@ -402,10 +404,10 @@ class JackEngine
          jack_status_t  status;
 
          // Midi event heap.
-         mMidiHeap = new MidiHeap(1024);
+         mMidiHeap = new MidiHeap(MIDI_HEAP_SIZE);
 
          // Create the ringbuffer.
-         mRingbuffer = jack_ringbuffer_create(1024 * sizeof(MidiMessage));
+         mRingbuffer = jack_ringbuffer_create(RINGBUFFER_SIZE * sizeof(MidiMessage));
 
          if ((mClient = jack_client_open("jctracker", options, &status)) == 0)
             throw "Jack server is not running.";
@@ -1417,6 +1419,7 @@ void play(JackEngine *jack, Sequencer &seq)
       // The list to keep track of notes that should be muted at the next iteration.
       // Replaces activeList at the end of this iter.
       std::list<NoteEvent*> nextActive;
+      bool bAdvanceTime = false;          // Should the time be advanced at the end of the iteration.
 
       // Check if we have a special command.
       {
@@ -1441,17 +1444,21 @@ void play(JackEngine *jack, Sequencer &seq)
          }
       }
 
-      // Start new notes.
+      // Start new notes. Loop through the event list.
       for (std::vector<Event*>::iterator jt = eventVec.begin(); jt != eventVec.end(); jt ++)
       {
          unsigned stopChannel = (unsigned)-1;
          std::list<NoteEvent*> nextActives;
 
+         //===================================
+         // Check what kinf of event we have.
          {
             // A regular note.
             NoteEvent *e = dynamic_cast<NoteEvent*>(*jt);
             if (e != NULL)
             {
+               bAdvanceTime = true;
+
                // Mark the column on which we need to mute previous notes.
                stopChannel = e->column;
 
@@ -1518,19 +1525,25 @@ void play(JackEngine *jack, Sequencer &seq)
             SkipEvent *e = dynamic_cast<SkipEvent*>(*jt);
             if (e != NULL)
             {
+               bAdvanceTime = true;
                stopChannel = e->column;
             }
          }
+
+         {
+            PedalEvent *e = dynamic_cast<PedalEvent*>(*jt);
+            if (e != NULL)
+               bAdvanceTime = true;
+         }
+         //========================
+         // End of events block.
          
          // Stop previous note on this channel. TODO: if a pattern is empty the note does not get silenced.
          if (stopChannel != (unsigned)-1)
          {
             // Resize the channel vector if needed.
             if (stopChannel >= activeNotesVec.size())
-            {
-               trace("resizing activeNotesVec: %d\n", stopChannel + 1);
                activeNotesVec.resize(stopChannel + 1);
-            }
 
             // Stop previous notes on this channel.
             for (std::list<NoteEvent*>::iterator activeIt = activeNotesVec[stopChannel].begin();
@@ -1545,7 +1558,9 @@ void play(JackEngine *jack, Sequencer &seq)
          }
       }
 
-      currentTime += jack->msToNframes(60 * 1000 / tempo / quantz);
+      // Finally advance the current time.
+      if (bAdvanceTime)
+         currentTime += jack->msToNframes(60 * 1000 / tempo / quantz);
    }  // End of the main loop.
 
    // Queue NOTE_OFF for the remaining notes.
