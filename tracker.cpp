@@ -835,7 +835,7 @@ struct MidiCtlEvent : public Event
    unsigned column;
    unsigned controller;
    unsigned value;
-   unsigned valueB;
+   unsigned initValue;
    double time;
    double delay;
    double delayDiv;
@@ -846,6 +846,7 @@ struct MidiCtlEvent : public Event
       controller = 0;
       value = 0;
       delay = 0;
+      initValue = (unsigned)-1;
       delayDiv = 1;
    }
 
@@ -856,7 +857,7 @@ struct MidiCtlEvent : public Event
       column = clmn;
       controller = 0;
       value = 0;
-      valueB = (unsigned)-1;
+      initValue = (unsigned)-1;
       time = 0;
       delay = 0;
       delayDiv = 1;
@@ -866,13 +867,15 @@ struct MidiCtlEvent : public Event
 
       std::istringstream iss (str.substr(1));
 
-      if (!(iss >> controller) || iss.get() != '=' || !(iss >> value))
+      if (!(iss >> controller) || iss.get() != '=' || !(iss >> initValue))
          throw iss.tellg();
 
       while (iss.peek() == '.')
          iss.get();
 
-      iss >> valueB;
+      // If there are no second value, set the value to the initial.
+      if (!(iss >> value))
+         value = initValue;
 
       char c;
       while ((c = iss.get()) != EOF)
@@ -1419,7 +1422,9 @@ void play(JackEngine *jack, Sequencer &seq)
       // The list to keep track of notes that should be muted at the next iteration.
       // Replaces activeList at the end of this iter.
       std::list<NoteEvent*> nextActive;
-      bool bAdvanceTime = false;          // Should the time be advanced at the end of the iteration.
+
+      // The time should be advanced if there is a time taking event in the list.
+      bool bAdvanceTime = false;
 
       // Check if we have a special command.
       {
@@ -1493,7 +1498,7 @@ void play(JackEngine *jack, Sequencer &seq)
             {
                stopChannel = e->column;
 
-               if (e->valueB == (unsigned)-1 || e->time == 0 || e->value == e->valueB)
+               if (e->initValue == (unsigned)-1 || e->time == 0 || e->value == e->initValue)
                {
                   // This is a control message to the midi. Generate single event.
                   jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
@@ -1504,17 +1509,17 @@ void play(JackEngine *jack, Sequencer &seq)
                {
                   // This is ramp. Need to generate a bunch of messages.
                   unsigned timeStep = (jack->msToNframes(60 * 1000 / tempo / quantz) * e->time / e->delayDiv)
-                                       / abs((int)e->valueB - e->value);
-                  for (unsigned i = e->value; i != e->valueB; i += (e->valueB > e->value ? 1 : -1))
+                                       / abs((int)e->initValue - e->value);
+                  for (unsigned i = e->initValue; i != e->value; i += (e->value > e->initValue ? 1 : -1))
                   {
                      jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
                            currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                              + timeStep * abs((int)e->value - i),
                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                   }
-                  jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->valueB,
+                  jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
                         currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                        + timeStep * abs((int)e->value - e->valueB),
+                         + timeStep * abs((int)e->value - e->value),
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                }
             }
@@ -1558,10 +1563,11 @@ void play(JackEngine *jack, Sequencer &seq)
          }
       }
 
-      // Finally advance the current time.
+      // Advance the current time.
       if (bAdvanceTime)
          currentTime += jack->msToNframes(60 * 1000 / tempo / quantz);
-   }  // End of the main loop.
+   } 
+   // End of the playing loop.
 
    // Queue NOTE_OFF for the remaining notes.
    for (std::vector<std::list<NoteEvent*>>::iterator it = activeNotesVec.begin();
