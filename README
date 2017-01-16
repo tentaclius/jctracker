@@ -1,18 +1,23 @@
-Simple MIDI tracker for Jack audio engine.
-Currently in early development. More features pending.
-Reads standard input for commands and notes to play, sends the corresponding MIDI events to
-the specified port.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Simple MIDI tracker for Jack audio engine.
+;; Currently in early development. Some of the planned features are not yet implemented. But it works as is :)
+;;
+;; Reads standard input for commands and notes to play, sends the corresponding MIDI events to
+;; the specified port.
+;; 
+;; Author: Anton Erdman <tentaclius at gmail>
+;; License: BSD. Please see the LICENSE file for details.
+;; 
+;; To compile the program you will need the following packages: g++, make, libjack-jackd2-dev (Jack Audio development files).
+;; The binary file available in the repository is built on Ubuntu 16.04.1.
+;; 
+;; The following lines illustrate the valid commands. The comments start with ";" sign.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-Author: Anton Erdman <tentaclius at gmail>
-License: BSD. Please see the LICENSE file for details.
+;; -----------------------------------------------------------------------------------------------------
+;; Individual notes.
 
-To compile the program you will need the following packages: g++, make, libjack-jackd2-dev (Jack Audio development files).
-The binary file available in the repository is built on Ubuntu 16.04.1.
-
-The following lines illustrate the valid commands.
-
-
-         ; Comment line. Empty lines does not make a pause in the playback.
+         ; Comment line. Empty lines does not count and does not alter time.
 A5       ; The note A of fifth octave.
 C        ; The note C of default (fourth) octave.
 c        ; The same note; parser is case insensitive to notes.
@@ -21,29 +26,40 @@ Bb       ; B flat.
 B&       ; Another way of saying B-flat.
 A#7      ; A shart of 7th octave.
 
+;; -----------------------------------------------------------------------------------------------------
+;; Volume, note length and node delay modifiers.
+
 C!40     ; Specify the velocity of the note (0..64).
 C%20     ; Delay before the note plays in microseconds.
 C@100    ; Note playing time in microseconds.
 C%20@200!64    ; All modifiers together. The order does not matter.
-c:1/2    ; 1/2 of the note length.
+c:1/2    ; 1/2 of the current note length.
 c:4+1/2  ; Note plyaing time is 4/2, start delay is 1/2 of the current note size.
          ; If both "@" and ":" delays are given, the delaying time is the sum of the two.
          ; All time modifiers can be real numbers.
+
+;; -----------------------------------------------------------------------------------------------------
+;; Playing multiple tones.
 
 C E G    ; Play several notes simultaneously.
          ; There are three columns, you can manage what port/channel each column
          ; belongs to by using "port" (see below).
 (C E) G  ; Group first two notes, so both events associated with the first column.
+         ; This might be useful if you assign several MIDI channels/ports for different columns
+         ; using "port" command (see below).
+
+;; -----------------------------------------------------------------------------------------------------
+;; Other note patterns.
 
 .        ; Skip a turn. A silent note.
 *        ; Play a default note. The default note is set by "default" command.
 ^        ; Repeat the last note.
 
-C        ; Start the note...
-|        ; ... and keep playing it while the "|" sign appears in the pattern.
-|        ; ...
+|        ; Do not mute the previous note in this column.
 
+;; -----------------------------------------------------------------------------------------------------
 ;; Full note format:
+
 ; <NoteName> [(#|b|&|n)] [<OctaveNumber>] [<Modifiers>]
 ;   where <Modifiers> contain one or several of the following (order is not important):
 ; !<IntegerNumber>      ; set the note's velocity;
@@ -53,11 +69,16 @@ C        ; Start the note...
 ; +<RealNumber>         ; delay the note in current note size parts;
 ; /<RealNumber>         ; specify the parts devisor for "+" and ":" modifiers.
 
+;; -----------------------------------------------------------------------------------------------------
 ;; Controlling directives.
-default C#4    ; Set the default note (directive are case sensitive).
+
+default C#4    ; Set the default note (directives are case sensitive).
 volume 50      ; Set the default volume for the notes (0..64).
 transpose 10   ; Transpose the notes.
 tempo 120      ; Set the playing speed in BPM.
+
+;; -----------------------------------------------------------------------------------------------------
+;; Loops.
 
 loop 4         ; Play the block for n times.
 c e g          ; If the number of repititions is not specified, the loop will go forever.
@@ -66,23 +87,46 @@ d f a
 . . .          
 endloop
 
+;; -----------------------------------------------------------------------------------------------------
 ;; Bar separator.
+
 -------        ; Visual bar separator. The number of '-' signs does not matter.
 ----- 3/4      ; You can set the quantization for the following blocks.
-               ; Currently only the nominator is important. It defines how many notes will fit into the next cycle.
+               ; Currently only the numerator is important. It defines how many notes will fit into the next cycle.
 --- 4/4 #C     ; Specify the size and default signs.
 --- #A bB nC   ; A-shart, B-flat, natural C.
-Bn             ; "n" suffix to play natural tone.
+Bn             ; "n" suffix to play natural tone within a section with altered pitches.
 
-alias drum C#2 ; Create an alias for the note.
+; Some examples for the bar.
+tempo 60       ; Set the playing pace. 60 BPM. Meaning the following bar will take 1/60 of a minute.
+---- 4/4       ; 4/4 specifies the bar will contain 4 notes. The time that was set with the tempo splits into 4 parts.
+C              ; A line corresponds to 1/240 of a minute.
+d
+e
+f
+---- 3/4       ; Change the bar dimennsions. From now, the line will represent 1/180 of a minute.
+g              ; I.e. the bar will contain 3 notes.
+a
+b
+----           ; The demonstrated bars will have the same time, as the tempo didn't change, but
+               ; will be split into different sized chunks.
+
+;; -----------------------------------------------------------------------------------------------------
+;; Aliases.
+
+;; You can create an alias for a note, e.g.
+alias drum C#2 ; Create an alias for C#2.
+               ; The upcoming occurences of "drum" in the pattern will be replaced with C#2.
+
+;; -----------------------------------------------------------------------------------------------------
+;; Other stuff. Some sidenotes.
 
 ;; Keep in mind that transpose, default, volume and alias modifiers are static, i.e. 
 loop
 c              ; Natural C will be played for all iterations.
---- #c         ; The signature change only applies to the notes after it.
+--- #c         ; The signature change only applies to the notes that go above this line despite the loop.
 c              ; Sharp C for all iterations.
 endloop
-;; The commands are applied at interpretation stage and affects the pattern directly.
 
 ;; tempo and --- (separator that also controls the quantization and signs) commands are dynamic.
 ;; I.e. in the following example the tempo will change in the middle of the iteration and will stay changed.
@@ -91,6 +135,9 @@ c
 tempo 120
 c
 endloop
+
+;; -----------------------------------------------------------------------------------------------------
+;; Creating and linking MIDI ports.
 
 ;    _ A column.
 ;    | _ [optional] Column range.
@@ -104,11 +151,15 @@ port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
                ; The program will make an attempt to connect to the input port
                ; of "zynaddsubfx", input port midi_in, channel 0.
 
-;; Note groups
+;; -----------------------------------------------------------------------------------------------------
+;; Note groups.
+
 (A B) C        ; Notes A and B will be sent to the channel associated with the first column. C to second column.
 
-;; MIDI controllers
+;; -----------------------------------------------------------------------------------------------------
+;; MIDI controllers.
+
 ; $<ControllerNumber>=<IntegerValue 0..127>[..<FinalValue>:<Time>[/<Factor>]]
-$4=100         ; Send the value 100 to the MIDI controller #4.
+$7=100         ; Send the value 100 to the MIDI controller #7 (volume for zynaddsbufx).
 (C $4=100)     ; MIDI controls can be grouped with the notes and are being sent to the corresponding channel.
 $7=0..127:3/2  ; Create a ramp of MIDI control messages. Change from 0 to 127 within 3/2 of current note time.

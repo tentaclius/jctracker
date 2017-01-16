@@ -28,7 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*
  Roadmap:
- [v] Set up jackd skeleton.
+ [v] Set up jackd client skeleton.
  [v] Try sending few single note_on note_off midi events to the gJack port in process() callback.
  [v] Signal handler to send midi stop all event.
  [v] Write the sequencer: note_on at the note appearing; note_off at the next note in the row.
