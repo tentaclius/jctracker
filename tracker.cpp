@@ -56,6 +56,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] Allow several notes for the channel.
  [v] MIDI control messages.
  [v] MIDI control ramp. $4=1..100:3/2
+ [ ] MIDI pitch bend control.
  [ ] sleep/pause command.
  [ ] Multiple matterns. define <name> ... end
  [ ] Pattern file management. "load" "reload"...
@@ -103,6 +104,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MIDI_ALL_NOTES_OFF             123
 #define MIDI_BANK_SELECT_MSB           0
 #define MIDI_BANK_SELECT_LSB           32
+#define MIDI_PITCH_BEND                0xE0
 
 #define MIDI_HEAP_SIZE                 1024
 #define RINGBUFFER_SIZE                1024
@@ -894,6 +896,10 @@ struct MidiCtlEvent : public Event
          }
       }
    }
+
+   MidiMessage midiMsg(unsigned channel, jack_port_t *port)
+   {
+   }
 };
 
 /*******************************************************************************************/
@@ -1514,12 +1520,12 @@ void play(JackEngine *jack, Sequencer &seq)
                   {
                      jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
                            currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                             + timeStep * abs((int)e->value - i),
+                             + timeStep * abs((int)e->initValue - i),
                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                   }
                   jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
                         currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                         + timeStep * abs((int)e->value - e->value),
+                         + timeStep * abs((int)e->initValue - e->value),
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
                }
             }
