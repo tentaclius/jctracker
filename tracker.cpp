@@ -1527,7 +1527,10 @@ void play(JackEngine *jack, Sequencer &seq)
          {
             // Resize the channel vector if needed.
             if (stopChannel >= activeNotesVec.size())
+            {
+               trace("resizing activeNotesVec: %d\n", stopChannel + 1);
                activeNotesVec.resize(stopChannel + 1);
+            }
 
             // Stop previous notes on this channel.
             for (std::list<NoteEvent*>::iterator activeIt = activeNotesVec[stopChannel].begin();
