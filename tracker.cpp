@@ -56,8 +56,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] Allow several notes for the channel.
  [v] MIDI control messages.
  [v] MIDI control ramp. $4=1..100:3/2
- [ ] Pattern file management: load, unload, reload of multiple patterns.
  [ ] sleep/pause command.
+ [ ] Multiple matterns. define <name> ... end
+ [ ] Pattern file management. "load" "reload"...
  [ ] Better error messages for the parser (with highlighting the error position).
  [ ] OSC controls.
  [ ] 'define' full pattern.
