@@ -145,7 +145,7 @@ endloop
 ;    | | |             _ [optional] MIDI channel.
 ;    | | |             | _ [optional] Port to try to connect to.
 ;    | | |             | |
-port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
+port 1 3 output_to_zyn 0 zynaddsubfx:midi_in
                ; The first, second and the third columns to be sent to
                ; the output channel named "output_to_zyn".
                ; The program will make an attempt to connect to the input port
