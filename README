@@ -159,7 +159,10 @@ port 0 2 output_to_zyn 0 zynaddsubfx:midi_in
 ;; -----------------------------------------------------------------------------------------------------
 ;; MIDI controllers.
 
-; $<ControllerNumber>=<IntegerValue 0..127>[..<FinalValue>:<Time>[/<Factor>]]
+; $<ControllerNumber>=<IntegerValue 0..127>[..<FinalValue>][..<Step>][:<Time>][/<Factor>]
 $7=100         ; Send the value 100 to the MIDI controller #7 (volume for zynaddsbufx).
 (C $4=100)     ; MIDI controls can be grouped with the notes and are being sent to the corresponding channel.
 $7=0..127:3/2  ; Create a ramp of MIDI control messages. Change gradually from 0 to 127 within 3/2 of current note time.
+
+; For Pitch Bend controller there is a special form:
+$pb=0..16383   ; 8192 is the middle value meaning no pitch bend.

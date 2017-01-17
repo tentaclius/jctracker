@@ -56,11 +56,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] Allow several notes for the channel.
  [v] MIDI control messages.
  [v] MIDI control ramp. $4=1..100:3/2
- [ ] MIDI pitch bend control.
+ [v] MIDI pitch bend control.
+ [ ] Better error messages for the parser (with highlighting the error position).
  [ ] sleep/pause command.
  [ ] Multiple matterns. define <name> ... end
  [ ] Pattern file management. "load" "reload"...
- [ ] Better error messages for the parser (with highlighting the error position).
  [ ] OSC controls.
  [ ] 'define' full pattern.
  [ ] Ligato.
@@ -493,6 +493,10 @@ class JackEngine
       {
          mMidiHeap->insert(message);
       }
+      void queueMidiEvent(MidiMessage message)
+      {
+         mMidiHeap->insert(message);
+      }
 
       /***************************************************/
       /* Put a midi message into the heap. */
@@ -834,21 +838,28 @@ struct NoteEvent : public Event
 /* A message to a midi controller. */
 struct MidiCtlEvent : public Event
 {
+   enum {CTLTYPE_CONTROL, CTLTYPE_PITCHBEND} type;
    unsigned column;
    unsigned controller;
    unsigned value;
    unsigned initValue;
+   unsigned step;
    double time;
    double delay;
    double delayDiv;
 
    MidiCtlEvent()
    {
+      type = CTLTYPE_CONTROL;
       column = 0;
       controller = 0;
+
       value = 0;
-      delay = 0;
       initValue = (unsigned)-1;
+      step = 1;
+
+      time = 0;
+      delay = 0;
       delayDiv = 1;
    }
 
@@ -856,10 +867,14 @@ struct MidiCtlEvent : public Event
    /* Construct the control by parsing the string. */
    MidiCtlEvent(const std::string &str, unsigned clmn = 0)
    {
+      type = CTLTYPE_CONTROL;
       column = clmn;
       controller = 0;
+
       value = 0;
       initValue = (unsigned)-1;
+      step = 1;
+
       time = 0;
       delay = 0;
       delayDiv = 1;
@@ -869,15 +884,37 @@ struct MidiCtlEvent : public Event
 
       std::istringstream iss (str.substr(1));
 
-      if (!(iss >> controller) || iss.get() != '=' || !(iss >> initValue))
-         throw iss.tellg();
+      // Check if this is a special case of Pitch Bend.
+      if (str.substr(0, 3) == "$pb")
+      {
+         type = CTLTYPE_PITCHBEND;
+         iss.seekg(2);
+      }
+      else
+      {
+         if (!(iss >> controller))
+            throw (int)iss.tellg();
+      }
 
+      // Read the initial value and throw the position in case of parsing error.
+      if (iss.get() != '=' || !(iss >> initValue))
+         throw (int)iss.tellg();
+
+      // Skip "..".
       while (iss.peek() == '.')
          iss.get();
 
       // If there are no second value, set the value to the initial.
       if (!(iss >> value))
          value = initValue;
+
+      // Skip "..".
+      while (iss.peek() == '.')
+         iss.get();
+
+      // Try to read step value.
+      iss.clear();
+      iss >> step;
 
       char c;
       while ((c = iss.get()) != EOF)
@@ -897,8 +934,25 @@ struct MidiCtlEvent : public Event
       }
    }
 
-   MidiMessage midiMsg(unsigned channel, jack_port_t *port)
+   MidiMessage midiMsg(jack_nframes_t time, unsigned value, unsigned channel, jack_port_t *port)
    {
+      unsigned b0, b1, b2;
+
+      switch (type)
+      {
+         case CTLTYPE_PITCHBEND:
+            b0 = MIDI_PITCH_BEND;
+            b1 = 0b01111111 & value;
+            b2 = 0b01111111 & (value >> 7);
+            break;
+
+         case CTLTYPE_CONTROL:
+            b0 = MIDI_CONTROLLER;
+            b1 = controller;
+            b2 = value;
+      }
+
+      return MidiMessage(b0, b1, b2, time, channel, port);
    }
 };
 
@@ -1115,7 +1169,7 @@ class Parser
             }
             catch (int e)
             {
-               throw iss.tellg();
+               throw (int)iss.tellg();
             }
 
             return eventList;
@@ -1154,7 +1208,7 @@ class Parser
 
             // Mandatory parameters.
             if (!(iss >> columnA))
-               throw iss.tellg();
+               throw (int)iss.tellg();
 
             // Second column number is optional.
             if (!(iss >> columnB))
@@ -1165,7 +1219,7 @@ class Parser
 
             // The port name is mandatory.
             if (!(iss >> portName))
-               throw iss.tellg();
+               throw (int)iss.tellg();
 
             // Optional parameters.
             iss >> channel;
@@ -1200,7 +1254,7 @@ class Parser
             std::string alias, replacement;
             
             if (!(iss >> alias))
-               throw iss.tellg();
+               throw (int)iss.tellg();
 
             if (!(iss >> replacement))
             {
@@ -1283,7 +1337,7 @@ class Parser
                   try {
                      eventList.push_back(new MidiCtlEvent(chunk, column));
                   } catch (int e) {
-                     throw e + iss.tellg();
+                     throw e + (int)iss.tellg();
                   }
                }
 
@@ -1502,31 +1556,53 @@ void play(JackEngine *jack, Sequencer &seq)
             MidiCtlEvent *e = dynamic_cast<MidiCtlEvent*>(*jt);
             if (e != NULL)
             {
-               stopChannel = e->column;
+               stopChannel = e->column;      // TODO: should it be here?
 
                if (e->initValue == (unsigned)-1 || e->time == 0 || e->value == e->initValue)
                {
                   // This is a control message to the midi. Generate single event.
+                  /*
                   jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
                         currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+                  */
+                  jack->queueMidiEvent(e->midiMsg(
+                           currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
+                           e->value,
+                           seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
                }
                else
                {
                   // This is ramp. Need to generate a bunch of messages.
                   unsigned timeStep = (jack->msToNframes(60 * 1000 / tempo / quantz) * e->time / e->delayDiv)
                                        / abs((int)e->initValue - e->value);
-                  for (unsigned i = e->initValue; i != e->value; i += (e->value > e->initValue ? 1 : -1))
+                  for (unsigned i = e->initValue;
+                       (e->value > e->initValue) ? (i < e->value) : (i > e->value);
+                       i += (e->value > e->initValue ? e->step : -e->step))
                   {
+                     /*
                      jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
                            currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                              + timeStep * abs((int)e->initValue - i),
                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+                     */
+                     jack->queueMidiEvent(e->midiMsg(
+                              currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
+                               + timeStep * abs((int)e->initValue - i),
+                              i,
+                              seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
                   }
+                  /*
                   jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
                         currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                          + timeStep * abs((int)e->initValue - e->value),
                         seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
+                  */
+                  jack->queueMidiEvent(e->midiMsg(
+                           currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
+                            + timeStep * abs((int)e->initValue - e->value),
+                            e->value,
+                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
                }
             }
          }
