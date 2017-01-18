@@ -1065,6 +1065,8 @@ class Parser
       /* Remove spaces at the beginning and the end of the string */
       std::string trim(std::string s)
       {
+         if (s.empty())
+            return s;   // Empty string.
          unsigned a = 0, b = s.length() - 1;
 
          while (a < b && isblank(s[a])) a ++;
@@ -1580,24 +1582,12 @@ void play(JackEngine *jack, Sequencer &seq)
                        (e->value > e->initValue) ? (i < e->value) : (i > e->value);
                        i += (e->value > e->initValue ? e->step : -e->step))
                   {
-                     /*
-                     jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, i,
-                           currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                             + timeStep * abs((int)e->initValue - i),
-                           seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
-                     */
                      jack->queueMidiEvent(e->midiMsg(
                               currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                                + timeStep * abs((int)e->initValue - i),
                               i,
                               seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
                   }
-                  /*
-                  jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
-                        currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                         + timeStep * abs((int)e->initValue - e->value),
-                        seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
-                  */
                   jack->queueMidiEvent(e->midiMsg(
                            currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
                             + timeStep * abs((int)e->initValue - e->value),
