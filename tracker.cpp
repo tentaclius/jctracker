@@ -58,6 +58,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] MIDI control ramp. $4=1..100:3/2
  [v] MIDI pitch bend control.
  [ ] Better error messages for the parser (with highlighting the error position).
+ [ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
  [ ] sleep/pause command.
  [ ] Multiple matterns. define <name> ... end
  [ ] Pattern file management. "load" "reload"...
