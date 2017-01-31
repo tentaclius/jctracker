@@ -119,6 +119,8 @@ void* bufferProcessingThread(void *arg);
 
 bool gPlaying = false;
 
+class Sequencer;
+
 /*******************************************************************************************/
 /* TRACE */
 #ifdef DEBUG
@@ -139,6 +141,67 @@ void TRACE(const char *file, int line, const char *fmt, ...)
 #else
 #define trace(...) {}
 #endif
+
+/*******************************************************************************************/
+/* A class for synchronous output from realtime thread. */
+class OutputLine
+{
+   private:
+      std::vector<std::string> mQueue;
+      unsigned mReadIdx, mWriteIdx;
+      pthread_mutex_t mMutex;
+      pthread_cond_t mCond;
+
+      inline unsigned advanceIndex(unsigned idx)
+      {
+         idx ++;
+         if (idx == mQueue.size())
+            idx = 0;
+         return idx;
+      }
+
+      inline bool isFull()
+      {
+         return advanceIndex(mWriteIdx) == mReadIdx;
+      }
+
+      inline bool isEmpty()
+      {
+         return mReadIdx == mWriteIdx;
+      }
+   
+   public:
+      OutputLine(size_t size)
+      {
+         mQueue.resize(size);
+         mReadIdx = mWriteIdx = 0;
+      }
+
+      void push(std::string msg)
+      {
+         if (isFull())
+            return;
+         else {
+            mQueue[mWriteIdx] = msg;
+            mWriteIdx = advanceIndex(mWriteIdx);
+         }
+      }
+
+      std::string pull()
+      {
+         pthread_mutex_lock(&mMutex);
+
+         if (isEmpty())
+            pthread_cond_wait(&mCond, &mMutex);
+
+         std::string s = mQueue[mReadIdx];
+         mReadIdx = advanceIndex(mReadIdx);
+
+         pthread_mutex_unlock(&mMutex);
+
+         return s;
+      }
+};
 
 /*******************************************************************************************/
 /* struct MidiMessage */
@@ -935,6 +998,8 @@ struct MidiCtlEvent : public Event
       }
    }
 
+   /***************************************************/
+   /* Generate a MIDI message that corresponds to the object. */
    MidiMessage midiMsg(jack_nframes_t time, unsigned value, unsigned channel, jack_port_t *port)
    {
       unsigned b0, b1, b2;
@@ -1024,8 +1089,19 @@ struct LoopEvent : public Event
 /*******************************************************************************************/
 /* End of the loop. */
 struct EndLoopEvent : public Event
+{};
+
+/*******************************************************************************************/
+/* Start of a nested pattern definition. */
+struct SubpatternBeginEvent : public Event
 {
+   std::string name;
 };
+
+/*******************************************************************************************/
+/* End of a nested pattern definition. */
+struct SubpatternEndEvent : public Event
+{};
 
 /*******************************************************************************************/
 /* A structure to associate a port and a channel to a column. */
@@ -1390,14 +1466,18 @@ class Parser
 /* Interpret and process the pattern line by line. */
 class Sequencer
 {
+   JackEngine *mJack;
    std::vector<std::vector<Event*> > mSong;
    Parser mParser;
    size_t mCurrentPos;
    std::list<std::pair<int, unsigned> > mLoopStack;
 
+   std::map<std::string, Sequencer*> mSubSeqMap;
+
    public:
       Sequencer(JackEngine *j)
       {
+         mJack = j;
          mCurrentPos = 0;
       }
 
@@ -1412,8 +1492,32 @@ class Sequencer
             try
             {
                std::vector<Event*> lst = mParser.parseLine(line);
-               if (!lst.empty())
-                  mSong.push_back(lst);
+
+               // Continue if the event list is empty.
+               if (lst.empty())
+                  continue;
+
+               // Check wether this is a beginning of a nested sequence.
+               {
+                  SubpatternBeginEvent *e = dynamic_cast<SubpatternBeginEvent*>(lst[0]);
+                  if (e != NULL)
+                  {
+                     Sequencer *seq = new Sequencer(mJack);
+                     seq->readFromStream(ss);
+                     mSubSeqMap[e->name] = seq;
+                     continue;
+                  }
+               }
+
+               // Check if the end of a nested sequence.
+               {
+                  SubpatternEndEvent *e = dynamic_cast<SubpatternEndEvent*>(lst[0]);
+                  if (e != NULL)
+                     break;
+               }
+
+               // A lower level event. Leave it for runtime.
+               mSong.push_back(lst);
             }
             catch (int e)
             {
