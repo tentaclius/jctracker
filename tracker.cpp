@@ -1107,6 +1107,16 @@ struct SubpatternBeginEvent : public Event
 struct SubpatternEndEvent : public Event
 {};
 
+struct SubpatternPlayEvent : public Event
+{
+   Sequencer *sequencer;
+
+   SubpatternPlayEvent(Sequencer *aSequencer)
+   {
+      sequencer = aSequencer;
+   }
+};
+
 /*******************************************************************************************/
 /* A structure to associate a port and a channel to a column. */
 struct PortMap
@@ -1140,6 +1150,7 @@ class Parser
    std::vector<PortMap> mColumnMap;
    int mTranspose;
    size_t mLinePos;
+   std::map<std::string, Sequencer*> *mSubSeqMap;
 
    private:
       /***************************************************/
@@ -1160,8 +1171,9 @@ class Parser
    public:
       /***************************************************/
       /* Create the parser. */
-      Parser(size_t chan = 64)
+      Parser(std::map<std::string, Sequencer*> *subseq = NULL, size_t chan = 64)
       {
+         mSubSeqMap = subseq;
          mSigns = new std::vector<int>(12, 0);
          mChannelNum = chan;
          mLastNote = new std::vector<NoteEvent>(chan, NoteEvent(0,0,0,0,0));
@@ -1412,8 +1424,13 @@ class Parser
                // An aliased name.
                size_t terminalPosition = chunk.find_first_of("!%@/\\#.");
                std::string aliasPart = chunk.substr(0, terminalPosition);
+
                if (mAliases.find(aliasPart) != mAliases.end())
                   chunk.replace(0, terminalPosition, mAliases[aliasPart]);
+
+               // A subpattern by name.
+               if (mSubSeqMap != NULL && mSubSeqMap->find(aliasPart) != mSubSeqMap->end())
+                  eventList.push_back(new SubpatternPlayEvent(mSubSeqMap->at(aliasPart)));
 
                // Silent note.
                if (chunk == ".")
