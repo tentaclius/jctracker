@@ -1141,16 +1141,18 @@ struct PortMap
 /* Parse an input line. */
 class Parser
 {
-   size_t mChannelNum;
+   size_t                  mChannelNum;
    std::vector<NoteEvent> *mLastNote;
-   NoteEvent mDfltNote;
-   unsigned mVolume;
-   std::vector<int> *mSigns;
-   std::map<std::string, std::string> mAliases;
-   std::vector<PortMap> mColumnMap;
-   int mTranspose;
-   size_t mLinePos;
-   std::map<std::string, Sequencer*> *mSubSeqMap;
+   NoteEvent               mDfltNote;
+   unsigned                mVolume;
+   std::vector<int>       *mSigns;
+   std::map<std::string, std::string>
+                           mAliases;
+   std::vector<PortMap>    mColumnMap;
+   int                     mTranspose;
+   size_t                  mLinePos;
+   std::map<std::string, Sequencer*> 
+                          *mSubSeqMap;
 
    private:
       /***************************************************/
@@ -1184,6 +1186,7 @@ class Parser
       }
 
       /***************************************************/
+      /* Destructor. */
       ~Parser()
       {
          delete mLastNote;
@@ -1505,12 +1508,16 @@ class Parser
 class Sequencer
 {
    JackEngine *mJack;
-   std::vector<std::vector<Event*> > mSong;
-   Parser mParser;
-   size_t mCurrentPos;
-   std::list<std::pair<int, unsigned> > mLoopStack;
-
-   std::map<std::string, Sequencer*> mSubSeqMap;
+   std::vector<std::vector<Event*>>
+               mSong;
+   Parser      mParser;
+   size_t      mCurrentPos;
+   std::list<std::pair<int, unsigned>>
+               mLoopStack;
+   std::list<NoteEvent*>
+               mActiveNoteLst;
+   std::map<std::string, Sequencer*>
+               mSubSeqMap;
 
    public:
       Sequencer(JackEngine *j)
@@ -1606,6 +1613,13 @@ class Sequencer
       PortMap& getPortMap(unsigned column)
       {
          return mParser.getPortMap(column);
+      }
+
+      /*****************************************************/
+      /* Return a list of notes that needs to be stopped in this iteration. */
+      std::list<NoteEvent*> notesToStop()
+      {
+         // TODO
       }
 };
 
