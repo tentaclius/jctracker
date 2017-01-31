@@ -57,11 +57,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] MIDI control messages.
  [v] MIDI control ramp. $4=1..100:3/2
  [v] MIDI pitch bend control.
+ [ ] Multiple matterns. define <name> ... end
+ [ ] sleep/pause command.
  [ ] Better error messages for the parser (with highlighting the error position).
  [ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
- [ ] sleep/pause command.
- [ ] Multiple matterns. define <name> ... end
- [ ] Pattern file management. "load" "reload"...
  [ ] OSC controls.
  [ ] 'define' full pattern.
  [ ] Ligato.
@@ -1096,6 +1095,11 @@ struct EndLoopEvent : public Event
 struct SubpatternBeginEvent : public Event
 {
    std::string name;
+
+   SubpatternBeginEvent(std::string aName)
+   {
+      name = aName;
+   }
 };
 
 /*******************************************************************************************/
@@ -1236,6 +1240,23 @@ class Parser
 
          // Process the line word by word next.
          iss >> chunk;
+
+         // If this is a beginning of a sub-pattern.
+         if (chunk == "define")
+         {
+            std::string name;
+            if (iss >> name)
+               eventList.push_back(new SubpatternBeginEvent(name));
+
+            return eventList;
+         }
+
+         // End of sub-pattern definition.
+         if (chunk == "end")
+         {
+            eventList.push_back(new SubpatternEndEvent());
+            return eventList;
+         }
 
          // Set the default note.
          if (chunk == "default")
