@@ -1659,7 +1659,7 @@ class Sequencer
 
       /*****************************************************/
       /* Queue MIDI events from the current position of the sequencer. */
-      bool playCurrentLine()
+      bool playNextLine()
       {
          EventListT eventLst = getNextLine();
          if (eventLst.empty())
@@ -1801,7 +1801,7 @@ class Sequencer
 
                   SubpatternPlayEvent *pattern = dynamic_cast<SubpatternPlayEvent*>(e->event);
                   if (pattern != NULL)
-                     pattern->sequencer->playCurrentLine();
+                     pattern->sequencer->playNextLine();
                }
             }
 
@@ -1814,7 +1814,7 @@ class Sequencer
                   stopChannel = e->column;
 
                   e->sequencer->initPosition();
-                  e->sequencer->playCurrentLine();
+                  e->sequencer->playNextLine();
                   nextActives.push_back(*jt);
                }
             }
@@ -1892,7 +1892,7 @@ class Sequencer
 void play(JackEngine *jack, Sequencer &seq)
 {
    // Play while we got something to play.
-   while (gPlaying && seq.playCurrentLine());
+   while (gPlaying && seq.playNextLine());
 
    // Wait for all events to be processed.
    while (jack->hasPendingEvents() & gPlaying)
