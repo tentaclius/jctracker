@@ -57,7 +57,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] MIDI control messages.
  [v] MIDI control ramp. $4=1..100:3/2
  [v] MIDI pitch bend control.
- [ ] Multiple matterns. define <name> ... end
+ [v] Multiple matterns. define <name> ... end
+ [ ] Rewrite Events with virtual functions noteOn(), noteOff(), control()...
  [ ] sleep/pause command.
  [ ] Better error messages for the parser (with highlighting the error position).
  [ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
@@ -424,7 +425,7 @@ class MidiHeap
 };
 
 /*******************************************************************************************/
-/* Manage Jack connection and hide specific objects. */
+/* Manage Jack connection and hide specific objects. Singleton. */
 class JackEngine
 {
    private:
@@ -452,11 +453,18 @@ class JackEngine
          return;
       }
 
-   public:
-
       /***************************************************/
+      /* Hide the constructor, as it is a singleton. */
       JackEngine()
       {
+      }
+
+   public:
+      /***************************************************/
+      static JackEngine* instance()
+      {
+         static JackEngine *inst = new JackEngine();
+         return inst;
       }
 
       /***************************************************/
@@ -592,18 +600,18 @@ class JackEngine
       friend void jack_shutdown_cb(void *arg);
       friend void stop_all_sound();
       friend void* bufferProcessingThread(void *arg);
-}
-gJack;
+};
 
 /*******************************************************************************************/
 /* Signal handler. */
 void signalHandler(int s)
 {
+   JackEngine *jack = JackEngine::instance();
    std::cerr << "Signal " << s << " arrived. Shutting down." << std::endl;
-   gJack.stopSounds();
+   jack->stopSounds();
    gPlaying = false;
    usleep(100000);
-   gJack.shutdown();
+   jack->shutdown();
    exit(1);
 }
 
@@ -1211,6 +1219,8 @@ class Parser
       /* Parse a given line (with one or multiple directives or patterns). */
       EventListT parseLine(std::string line)
       {
+         JackEngine *jack = JackEngine::instance();
+
          mLinePos = 0;
 
          std::string chunk;          // A piece of the line to read the command.
@@ -1355,7 +1365,7 @@ class Parser
             iss >> channel;
 
             // Create the port.
-            jack_port_t *port = gJack.registerOutputPort(portName);
+            jack_port_t *port = jack->registerOutputPort(portName);
 
             // Associate the columns.
             if (mColumnMap.size() < columnB)
@@ -1372,7 +1382,7 @@ class Parser
             connClient = trim(connClient);
 
             if (!connClient.empty())
-               if (gJack.connectPort(port, connClient) != 0)
+               if (jack->connectPort(port, connClient) != 0)
                   std::cerr << "WARNING! Can not connect to client " << connClient << std::endl;
 
             return eventList;
@@ -1648,15 +1658,8 @@ class Sequencer
       }
 
       /*****************************************************/
-      /* Return the mapping of the event's column to the port and channel. */
-      PortMap& getPortMap(unsigned column)
-      {
-         return mParser->getPortMap(column);
-      }
-
-      /*****************************************************/
       /* Queue MIDI events from the current position of the sequencer. */
-      bool playLine()
+      bool playCurrentLine()
       {
          EventListT eventLst = getNextLine();
          if (eventLst.empty())
@@ -1714,7 +1717,7 @@ class Sequencer
                         mCurrentTime + mJack->msToNframes(e->delay)
                          + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->partDelay / e->partDiv) : 0)
                          + e->column,
-                        getPortMap(e->column).channel, getPortMap(e->column).port);
+                        mParser->getPortMap(e->column).channel, mParser->getPortMap(e->column).port);
 
                   if (!e->endless)
                   {
@@ -1730,7 +1733,7 @@ class Sequencer
                                + mJack->msToNframes(e->time)
                                + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize)
                                      * e->partTime / e->partDiv) : 0) - 2,
-                              getPortMap(e->column).channel, getPortMap(e->column).port);
+                              mParser->getPortMap(e->column).channel, mParser->getPortMap(e->column).port);
                   }
                }
             }
@@ -1753,7 +1756,7 @@ class Sequencer
                      mJack->queueMidiEvent(e->midiMsg(
                               mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv),
                               e->value,
-                              getPortMap(e->column).channel, getPortMap(e->column).port));
+                              mParser->getPortMap(e->column).channel, mParser->getPortMap(e->column).port));
                   }
                   else
                   {
@@ -1768,13 +1771,13 @@ class Sequencer
                                  mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv)
                                   + timeStep * abs((int)e->initValue - i),
                                  i,
-                                 getPortMap(e->column).channel, getPortMap(e->column).port));
+                                 mParser->getPortMap(e->column).channel, mParser->getPortMap(e->column).port));
                      }
                      mJack->queueMidiEvent(e->midiMsg(
                               mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv)
                                + timeStep * abs((int)e->initValue - e->value),
                               e->value,
-                              getPortMap(e->column).channel, getPortMap(e->column).port));
+                              mParser->getPortMap(e->column).channel, mParser->getPortMap(e->column).port));
                   }
                }
             }
@@ -1798,7 +1801,7 @@ class Sequencer
 
                   SubpatternPlayEvent *pattern = dynamic_cast<SubpatternPlayEvent*>(e->event);
                   if (pattern != NULL)
-                     pattern->sequencer->playLine();
+                     pattern->sequencer->playCurrentLine();
                }
             }
 
@@ -1811,14 +1814,14 @@ class Sequencer
                   stopChannel = e->column;
 
                   e->sequencer->initPosition();
-                  e->sequencer->playLine();
+                  e->sequencer->playCurrentLine();
                   nextActives.push_back(*jt);
                }
             }
             //========================
             // End of events block.
 
-            // Stop previous note(s) on this channel. TODO: if a pattern is empty the note does not get silenced.
+            // Stop previous note(s) on this channel. TODO: fix that if a pattern is empty the note does not get silenced.
             if (stopChannel != (unsigned)-1)
             {
                // Resize the channel vector if needed.
@@ -1834,7 +1837,7 @@ class Sequencer
                   NoteEvent *note = dynamic_cast<NoteEvent*>(*activeIt);
                   if (note != NULL)
                      mJack->queueMidiEvent(MIDI_NOTE_OFF, note->pitch, 0, mCurrentTime - 1 - stopChannel,
-                           getPortMap(stopChannel).channel, getPortMap(stopChannel).port);
+                           mParser->getPortMap(stopChannel).channel, mParser->getPortMap(stopChannel).port);
 
                   // Stop a pattern.
                   SubpatternPlayEvent *seq = dynamic_cast<SubpatternPlayEvent*>(*activeIt);
@@ -1865,7 +1868,7 @@ class Sequencer
                NoteEvent *n = dynamic_cast<NoteEvent*>((*it).front());
                if (n != NULL)
                   mJack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, mCurrentTime - 1,
-                        getPortMap(n->column).channel, getPortMap(n->column).port);
+                        mParser->getPortMap(n->column).channel, mParser->getPortMap(n->column).port);
 
                SubpatternPlayEvent *s = dynamic_cast<SubpatternPlayEvent*>((*it).front());
                if (s != NULL)
@@ -1888,194 +1891,8 @@ class Sequencer
 /* Read the data from the sequencer and queue the midi events to Jack */
 void play(JackEngine *jack, Sequencer &seq)
 {
-   while (gPlaying)
-      seq.playLine();
-   return;
-
-   // Runtime values.
-   unsigned tempo = 100;
-   unsigned quantz = 4;
-   std::vector<std::list<NoteEvent*>> activeNotesVec;
-
-   jack_nframes_t currentTime = jack->currentFrameTime();
-
-   for (EventListT eventLst = seq.getNextLine();
-        !eventLst.empty() && gPlaying;
-        eventLst = seq.getNextLine())
-   {
-      // The list to keep track of notes that should be muted at the next iteration.
-      // Replaces activeList at the end of this iter.
-      std::list<NoteEvent*> nextActive;
-
-      // The time should be advanced if there is a time taking event in the list.
-      bool bAdvanceTime = false;
-
-      // Check if we have a special command.
-      {
-         // Tempo change.
-         TempoEvent *e = dynamic_cast<TempoEvent*>(eventLst.front());
-         if (e != NULL)
-         {
-            tempo = e->tempo;
-            continue;
-         }
-      }
-
-      {
-         // Note size change.
-         BarEvent *e = dynamic_cast<BarEvent*>(eventLst.front());
-         if (e != NULL)
-         {
-            trace("bar\n");
-            if (e->nom > 0)
-               quantz = e->nom;
-            continue;
-         }
-      }
-
-      // Start new notes. Loop through the event list.
-      for (EventListT::iterator jt = eventLst.begin(); jt != eventLst.end(); jt ++)
-      {
-         unsigned stopChannel = (unsigned)-1;
-         std::list<NoteEvent*> nextActives;
-
-         //===================================
-         // Check what kinf of event we have.
-         {
-            // A regular note.
-            NoteEvent *e = dynamic_cast<NoteEvent*>(*jt);
-            if (e != NULL)
-            {
-               bAdvanceTime = true;
-
-               // Mark the column on which we need to mute previous notes.
-               stopChannel = e->column;
-
-               // Queue the note on event.
-               jack->queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
-                     currentTime + jack->msToNframes(e->delay)
-                      + (e->partDiv != 0 ? (jack->msToNframes(60 * 1000 / tempo /quantz) * e->partDelay / e->partDiv) : 0)
-                      + e->column,
-                     seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
-
-               if (!e->endless)
-               {
-                  if (e->time == 0 && e->partTime == 0)
-                     // If the note does not have specific sound time, turn it off at the next cycle.
-                     nextActives.push_back(e);
-                  else
-                     // If the note has specific time, schedule the off event right now.
-                     jack->queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
-                           currentTime + jack->msToNframes(e->delay)
-                            + (e->partDiv != 0 ? (jack->msToNframes(60 * 1000 / tempo / quantz) * e->partDelay / e->partDiv) : 0)
-                            + jack->msToNframes(e->time)
-                            + (e->partDiv != 0 ? (jack->msToNframes(60 * 1000 / tempo / quantz) * e->partTime / e->partDiv) : 0) - 2,
-                           seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
-               }
-            }
-         }
-
-         {
-            // Midi control.
-            MidiCtlEvent *e = dynamic_cast<MidiCtlEvent*>(*jt);
-            if (e != NULL)
-            {
-               stopChannel = e->column;      // TODO: should it be here?
-
-               if (e->initValue == (unsigned)-1 || e->time == 0 || e->value == e->initValue)
-               {
-                  // This is a control message to the midi. Generate single event.
-                  /*
-                  jack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
-                        currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
-                        seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port);
-                  */
-                  jack->queueMidiEvent(e->midiMsg(
-                           currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv),
-                           e->value,
-                           seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
-               }
-               else
-               {
-                  // This is ramp. Need to generate a bunch of messages.
-                  unsigned timeStep = (jack->msToNframes(60 * 1000 / tempo / quantz) * e->time / e->delayDiv)
-                                       / abs((int)e->initValue - e->value);
-                  for (unsigned i = e->initValue;
-                       (e->value > e->initValue) ? (i < e->value) : (i > e->value);
-                       i += (e->value > e->initValue ? e->step : -e->step))
-                  {
-                     jack->queueMidiEvent(e->midiMsg(
-                              currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                               + timeStep * abs((int)e->initValue - i),
-                              i,
-                              seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
-                  }
-                  jack->queueMidiEvent(e->midiMsg(
-                           currentTime + (jack->msToNframes(60 * 1000 / tempo / quantz) * e->delay / e->delayDiv)
-                            + timeStep * abs((int)e->initValue - e->value),
-                            e->value,
-                            seq.getPortMap(e->column).channel, seq.getPortMap(e->column).port));
-               }
-            }
-         }
-
-         {
-            // Skip a bit. Silence the previous notes.
-            SkipEvent *e = dynamic_cast<SkipEvent*>(*jt);
-            if (e != NULL)
-            {
-               bAdvanceTime = true;
-               stopChannel = e->column;
-            }
-         }
-
-         {
-            PedalEvent *e = dynamic_cast<PedalEvent*>(*jt);
-            if (e != NULL)
-               bAdvanceTime = true;
-         }
-         //========================
-         // End of events block.
-         
-         // Stop previous note on this channel. TODO: if a pattern is empty the note does not get silenced.
-         if (stopChannel != (unsigned)-1)
-         {
-            // Resize the channel vector if needed.
-            if (stopChannel >= activeNotesVec.size())
-               activeNotesVec.resize(stopChannel + 1);
-
-            // Stop previous notes on this channel.
-            for (std::list<NoteEvent*>::iterator activeIt = activeNotesVec[stopChannel].begin();
-                  activeIt != activeNotesVec[stopChannel].end();
-                  activeIt ++)
-            {
-               jack->queueMidiEvent(MIDI_NOTE_OFF, (*activeIt)->pitch, 0, currentTime - 1 - stopChannel,
-                     seq.getPortMap(stopChannel).channel, seq.getPortMap(stopChannel).port);
-            }
-
-            activeNotesVec[stopChannel] = nextActives;
-         }
-      }
-
-      // Advance the current time.
-      if (bAdvanceTime)
-         currentTime += jack->msToNframes(60 * 1000 / tempo / quantz);
-   } 
-   // End of the playing loop.
-
-   // Queue NOTE_OFF for the remaining notes.
-   for (std::vector<std::list<NoteEvent*>>::iterator it = activeNotesVec.begin();
-        it != activeNotesVec.end(); it ++)
-   {
-      while (!(*it).empty())
-      {
-         NoteEvent *n = (*it).front();
-         (*it).pop_front();
-
-         jack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, currentTime - 1,
-               seq.getPortMap(n->column).channel, seq.getPortMap(n->column).port);
-      }
-   }
+   // Play while we got something to play.
+   while (gPlaying && seq.playCurrentLine());
 
    // Wait for all events to be processed.
    while (jack->hasPendingEvents() & gPlaying)
@@ -2106,24 +1923,25 @@ int main(int argc, char **argv)
    gPlaying = true;
 
    // Init Jackd connection.
+   JackEngine *jack = JackEngine::instance();
    try {
-      gJack.init();
+      jack->init();
    } catch (std::string &s) {
       std::cout << "Error during Jack initialization: " << s << std::endl;
    }
    
    // Init the sequencer and load the pattern.
-   Sequencer seq (&gJack);
+   Sequencer seq (jack);
    seq.readFromStream(std::cin);
 
    // Play the pattern.
-   play(&gJack, seq);
+   play(jack, seq);
 
    // Shutdown the client and exit.
-   gJack.stopSounds();
+   jack->stopSounds();
    usleep(200000);
 
-   gJack.shutdown();
+   jack->shutdown();
 
    return 0;
 }
