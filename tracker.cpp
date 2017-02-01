@@ -1065,6 +1065,7 @@ struct PedalEvent : public Event
 
    PedalEvent(unsigned c, Event *anEvent)
    {
+      assert(anEvent != NULL);
       column = c;
       event = anEvent;
    }
@@ -1449,7 +1450,11 @@ class Parser
 
                // A subpattern by name.
                if (mSubSeqMap != NULL && mSubSeqMap->find(aliasPart) != mSubSeqMap->end())
-                  eventList.push_back(new SubpatternPlayEvent(mSubSeqMap->at(aliasPart), column));
+               {
+                  SubpatternPlayEvent *e = new SubpatternPlayEvent(mSubSeqMap->at(aliasPart), column);
+                  mLastNote[column] = e;
+                  eventList.push_back(e);
+               }
 
                // Silent note.
                else if (chunk == ".")
