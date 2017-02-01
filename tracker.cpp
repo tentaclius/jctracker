@@ -87,6 +87,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <signal.h>
 #include <pthread.h>
 #include <math.h>
+#include <assert.h>
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
@@ -126,7 +127,7 @@ bool gPlaying = false;
 /*******************************************************************************************/
 /* TRACE */
 #ifdef DEBUG
-#define trace(...) TRACE(__FILE__, __LINE__,  __VA_ARGS__);
+#define trace(...) {TRACE(__FILE__, __LINE__,  __VA_ARGS__);}
 void TRACE(const char *file, int line, const char *fmt, ...)
 {
    va_list argP;
@@ -1116,6 +1117,7 @@ struct SubpatternPlayEvent : public Event
 
    SubpatternPlayEvent(Sequencer *aSequencer)
    {
+      assert(aSequencer != NULL);
       sequencer = aSequencer;
    }
 };
@@ -1176,8 +1178,10 @@ class Parser
    public:
       /***************************************************/
       /* Create the parser. */
-      Parser(std::map<std::string, Sequencer*> *subseq = NULL, size_t chan = 64)
+      Parser(std::map<std::string, Sequencer*> *subseq, size_t chan = 64)
       {
+         assert(subseq != NULL);
+
          mSubSeqMap = subseq;
          mSigns = new std::vector<int>(12, 0);
          mChannelNum = chan;
@@ -1197,10 +1201,17 @@ class Parser
       }
 
       /***************************************************/
+      void setSubseqMap(std::map<std::string, Sequencer*> *subseq)
+      {
+         mSubSeqMap = subseq;
+      }
+
+      /***************************************************/
       /* Parse a given line (with one or multiple directives or patterns). */
       EventListT parseLine(std::string line)
       {
          mLinePos = 0;
+
          std::string chunk;          // A piece of the line to read the command.
          std::istringstream iss (line);
          EventListT eventList;
@@ -1434,12 +1445,14 @@ class Parser
                if (mAliases.find(aliasPart) != mAliases.end())
                   chunk.replace(0, terminalPosition, mAliases[aliasPart]);
 
+               /*=== Starting the individual elements processing in `if ... else if...` . ===*/
+
                // A subpattern by name.
                if (mSubSeqMap != NULL && mSubSeqMap->find(aliasPart) != mSubSeqMap->end())
                   eventList.push_back(new SubpatternPlayEvent(mSubSeqMap->at(aliasPart)));
 
                // Silent note.
-               if (chunk == ".")
+               else if (chunk == ".")
                   eventList.push_back(new SkipEvent(column));
 
                // Continuing the previous note.
@@ -1513,14 +1526,14 @@ class Sequencer
    JackEngine *mJack;
    std::vector<EventListT>
                mSong;
-   Parser      mParser;
+   Parser     *mParser;
    size_t      mCurrentPos;
    std::list<std::pair<int, unsigned>>
                mLoopStack;
 
    std::map<std::string, Sequencer*>
                mSubSeqMap;
-   std::vector<std::list<NoteEvent*>>
+   std::vector<EventListT>
                mActiveNotesVec;
    jack_nframes_t
                mCurrentTime;
@@ -1528,12 +1541,23 @@ class Sequencer
    unsigned    mQuantSize;
 
    public:
+      /*****************************************************/
+      /* Constructor. */
       Sequencer(JackEngine *j)
       {
          mJack = j;
          mCurrentPos = 0;
          mCurrentTime = mJack->currentFrameTime();
          mTempo = 100;
+         mQuantSize = 1;
+         mParser = new Parser(&mSubSeqMap);
+      }
+
+      /*****************************************************/
+      /* Destructor. */
+      ~Sequencer()
+      {
+         delete mParser;
       }
 
       /*****************************************************/
@@ -1546,7 +1570,7 @@ class Sequencer
          {
             try
             {
-               EventListT lst = mParser.parseLine(line);
+               EventListT lst = mParser->parseLine(line);
 
                // Continue if the event list is empty.
                if (lst.empty())
@@ -1622,7 +1646,7 @@ class Sequencer
       /* Return the mapping of the event's column to the port and channel. */
       PortMap& getPortMap(unsigned column)
       {
-         return mParser.getPortMap(column);
+         return mParser->getPortMap(column);
       }
 
       /*****************************************************/
@@ -1656,7 +1680,6 @@ class Sequencer
             BarEvent *e = dynamic_cast<BarEvent*>(eventLst.front());
             if (e != NULL)
             {
-               trace("bar\n");
                if (e->nom > 0)
                   mQuantSize = e->nom;
                return true;
@@ -1667,7 +1690,7 @@ class Sequencer
          for (EventListT::iterator jt = eventLst.begin(); jt != eventLst.end(); jt ++)
          {
             unsigned stopChannel = (unsigned)-1;
-            std::list<NoteEvent*> nextActives;
+            EventListT nextActives;
 
             //===================================
             // Check what kinf of event we have.
@@ -1732,17 +1755,17 @@ class Sequencer
                         / abs((int)e->initValue - e->value);
                      for (unsigned i = e->initValue;
                            (e->value > e->initValue) ? (i < e->value) : (i > e->value);
-                           i += (e->value > e->initValue ? e->step : -e->step))
+                           i += (e->value > e->initValue ? e->step : - e->step))
                      {
                         mJack->queueMidiEvent(e->midiMsg(
                                  mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv)
-                                 + timeStep * abs((int)e->initValue - i),
+                                  + timeStep * abs((int)e->initValue - i),
                                  i,
                                  getPortMap(e->column).channel, getPortMap(e->column).port));
                      }
                      mJack->queueMidiEvent(e->midiMsg(
                               mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv)
-                              + timeStep * abs((int)e->initValue - e->value),
+                               + timeStep * abs((int)e->initValue - e->value),
                               e->value,
                               getPortMap(e->column).channel, getPortMap(e->column).port));
                   }
@@ -1764,6 +1787,15 @@ class Sequencer
                if (e != NULL)
                   bAdvanceTime = true;
             }
+
+            {
+               SubpatternPlayEvent *e = dynamic_cast<SubpatternPlayEvent*>(*jt);
+               if (e != NULL)
+               {
+                  e->sequencer->initPosition();
+                  e->sequencer->playLine();
+               }
+            }
             //========================
             // End of events block.
 
@@ -1775,12 +1807,14 @@ class Sequencer
                   mActiveNotesVec.resize(stopChannel + 1);
 
                // Stop previous notes on this channel.
-               for (std::list<NoteEvent*>::iterator activeIt = mActiveNotesVec[stopChannel].begin();
+               for (EventListT::iterator activeIt = mActiveNotesVec[stopChannel].begin();
                      activeIt != mActiveNotesVec[stopChannel].end();
                      activeIt ++)
                {
-                  mJack->queueMidiEvent(MIDI_NOTE_OFF, (*activeIt)->pitch, 0, mCurrentTime - 1 - stopChannel,
-                        getPortMap(stopChannel).channel, getPortMap(stopChannel).port);
+                  NoteEvent *note = dynamic_cast<NoteEvent*>(*activeIt);
+                  if (note != NULL)
+                     mJack->queueMidiEvent(MIDI_NOTE_OFF, note->pitch, 0, mCurrentTime - 1 - stopChannel,
+                           getPortMap(stopChannel).channel, getPortMap(stopChannel).port);
                }
 
                mActiveNotesVec[stopChannel] = nextActives;
@@ -1792,12 +1826,12 @@ class Sequencer
             mCurrentTime += mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
 
          // Queue NOTE_OFF for the remaining notes.
-         for (std::vector<std::list<NoteEvent*>>::iterator it = mActiveNotesVec.begin();
+         for (std::vector<EventListT>::iterator it = mActiveNotesVec.begin();
                it != mActiveNotesVec.end(); it ++)
          {
             while (!(*it).empty())
             {
-               NoteEvent *n = (*it).front();
+               NoteEvent *n = dynamic_cast<NoteEvent*>((*it).front());
                (*it).pop_front();
 
                mJack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, mCurrentTime - 1,
@@ -1806,6 +1840,13 @@ class Sequencer
          }
 
          return true;
+      }
+
+      /*****************************************************/
+      /* Reset sequencer position. */
+      void initPosition()
+      {
+         mCurrentPos = 0;
       }
 };
 
@@ -2015,7 +2056,6 @@ void play(JackEngine *jack, Sequencer &seq)
 int main(int argc, char **argv)
 {
    std::string line;
-   Parser parser;
    
    // Setup signal handler.
    struct sigaction action;
