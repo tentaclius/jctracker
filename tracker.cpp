@@ -712,17 +712,16 @@ void* bufferProcessingThread(void *arg)
 
 /*******************************************************************************************/
 /* A parent of all possible tracker events. */
-class Event
+struct Event
 {
-   public:
-      virtual ~Event() {}
+   virtual ~Event() {}
+   unsigned column;
 };
 
 /*******************************************************************************************/
 /* A note to be played. */
 struct NoteEvent : public Event
 {
-   unsigned column;     // The internal channel number.
    unsigned pitch;      // The pitch of the note.
    unsigned volume;     // The volume.
    
@@ -736,8 +735,7 @@ struct NoteEvent : public Event
    bool     endless;    // Do not send NOTE_OFF for this note.
 
    NoteEvent(unsigned n, unsigned v, uint64_t tm, uint64_t dl, unsigned col)
-      : column(col)
-      , pitch(n)
+      : pitch(n)
       , volume(v)
       , delay(dl)
       , time(tm)
@@ -746,14 +744,17 @@ struct NoteEvent : public Event
       , partDiv(1)
       , natural(false)
       , endless(false)
-   {}
+   {
+      column = col;
+   }
 
    NoteEvent() { NoteEvent(0,64,0,0,0); }
 
    /***************************************************/
    /* Constructor that parses the note from the string. */
-   NoteEvent(const std::string &buf, unsigned column = 0)
+   NoteEvent(const std::string &buf, unsigned aColumn = 0)
    {
+      column = aColumn;
       const int octaveLen = 12;
       natural = false;
 
@@ -906,7 +907,6 @@ struct NoteEvent : public Event
 struct MidiCtlEvent : public Event
 {
    enum {CTLTYPE_CONTROL, CTLTYPE_PITCHBEND} type;
-   unsigned column;
    unsigned controller;
    unsigned value;
    unsigned initValue;
@@ -1029,8 +1029,6 @@ struct MidiCtlEvent : public Event
 /* Silent note or pause. */
 struct SkipEvent : public Event
 {
-   unsigned column;
-
    SkipEvent(unsigned col)
    {
       column = col;
@@ -1063,10 +1061,12 @@ struct TempoEvent : public Event
 /* The previous note will not be muted. */
 struct PedalEvent : public Event
 {
-   unsigned column;     // The internal channel number.
-   PedalEvent(unsigned c)
+   Event *event;
+
+   PedalEvent(unsigned c, Event *anEvent)
    {
       column = c;
+      event = anEvent;
    }
 
    ~PedalEvent() {}
@@ -1115,10 +1115,11 @@ struct SubpatternPlayEvent : public Event
 {
    Sequencer *sequencer;
 
-   SubpatternPlayEvent(Sequencer *aSequencer)
+   SubpatternPlayEvent(Sequencer *aSequencer, unsigned aColumn)
    {
       assert(aSequencer != NULL);
       sequencer = aSequencer;
+      column = aColumn;
    }
 };
 
@@ -1147,7 +1148,7 @@ struct PortMap
 class Parser
 {
    size_t                  mChannelNum;
-   std::vector<NoteEvent> *mLastNote;
+   std::vector<Event*>     mLastNote;
    NoteEvent               mDfltNote;
    unsigned                mVolume;
    std::vector<int>       *mSigns;
@@ -1185,7 +1186,7 @@ class Parser
          mSubSeqMap = subseq;
          mSigns = new std::vector<int>(12, 0);
          mChannelNum = chan;
-         mLastNote = new std::vector<NoteEvent>(chan, NoteEvent(0,0,0,0,0));
+         mLastNote.resize(chan, NULL);
          mDfltNote.set(0,0,0,0);
          mTranspose = 0;
          mVolume = 64;
@@ -1196,7 +1197,6 @@ class Parser
       /* Destructor. */
       ~Parser()
       {
-         delete mLastNote;
          delete mSigns;
       }
 
@@ -1449,7 +1449,7 @@ class Parser
 
                // A subpattern by name.
                if (mSubSeqMap != NULL && mSubSeqMap->find(aliasPart) != mSubSeqMap->end())
-                  eventList.push_back(new SubpatternPlayEvent(mSubSeqMap->at(aliasPart)));
+                  eventList.push_back(new SubpatternPlayEvent(mSubSeqMap->at(aliasPart), column));
 
                // Silent note.
                else if (chunk == ".")
@@ -1457,7 +1457,7 @@ class Parser
 
                // Continuing the previous note.
                else if (chunk == "|")
-                  eventList.push_back(new PedalEvent(column));
+                  eventList.push_back(new PedalEvent(column, mLastNote[column]));
 
                // Default note.
                else if (chunk == "*")
@@ -1465,7 +1465,7 @@ class Parser
 
                // Previous note.
                else if (chunk == "^")
-                  eventList.push_back(mLastNote->at(column).clone());
+                  eventList.push_back(mLastNote[column]);
 
                // A MIDI control message.
                else if (chunk.front() == '$')
@@ -1491,7 +1491,7 @@ class Parser
                   n->column = column;
 
                   // Store the value for the lastNote pattern.
-                  mLastNote->at(column).set(n->pitch, n->volume, n->time, n->delay);
+                  mLastNote[column] = n;
 
                   // Push the event into the return list.
                   eventList.push_back(n);
@@ -1549,7 +1549,7 @@ class Sequencer
          mCurrentPos = 0;
          mCurrentTime = mJack->currentFrameTime();
          mTempo = 100;
-         mQuantSize = 1;
+         mQuantSize = 4;
          mParser = new Parser(&mSubSeqMap);
       }
 
@@ -1707,22 +1707,24 @@ class Sequencer
                   // Queue the note on event.
                   mJack->queueMidiEvent(MIDI_NOTE_ON, e->pitch, e->volume,
                         mCurrentTime + mJack->msToNframes(e->delay)
-                        + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->partDelay / e->partDiv) : 0)
-                        + e->column,
+                         + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->partDelay / e->partDiv) : 0)
+                         + e->column,
                         getPortMap(e->column).channel, getPortMap(e->column).port);
 
                   if (!e->endless)
                   {
                      if (e->time == 0 && e->partTime == 0)
                         // If the note does not have specific sound time, turn it off at the next cycle.
-                        nextActives.push_back(e);
+                        nextActives.push_back(*jt);
                      else
                         // If the note has specific time, schedule the off event right now.
                         mJack->queueMidiEvent(MIDI_NOTE_OFF, e->pitch, e->volume,
                               mCurrentTime + mJack->msToNframes(e->delay)
-                              + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->partDelay / e->partDiv) : 0)
-                              + mJack->msToNframes(e->time)
-                              + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->partTime / e->partDiv) : 0) - 2,
+                               + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize)
+                                     * e->partDelay / e->partDiv) : 0)
+                               + mJack->msToNframes(e->time)
+                               + (e->partDiv != 0 ? (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize)
+                                     * e->partTime / e->partDiv) : 0) - 2,
                               getPortMap(e->column).channel, getPortMap(e->column).port);
                   }
                }
@@ -1733,7 +1735,7 @@ class Sequencer
                MidiCtlEvent *e = dynamic_cast<MidiCtlEvent*>(*jt);
                if (e != NULL)
                {
-                  stopChannel = e->column;      // TODO: should it be here?
+                  stopChannel = e->column;
 
                   if (e->initValue == (unsigned)-1 || e->time == 0 || e->value == e->initValue)
                   {
@@ -1783,17 +1785,29 @@ class Sequencer
             }
 
             {
+               // Just a sign that the note(s) on the channel should not be silenced.
                PedalEvent *e = dynamic_cast<PedalEvent*>(*jt);
                if (e != NULL)
+               {
                   bAdvanceTime = true;
+
+                  SubpatternPlayEvent *pattern = dynamic_cast<SubpatternPlayEvent*>(e->event);
+                  if (pattern != NULL)
+                     pattern->sequencer->playLine();
+               }
             }
 
             {
+               // This is a beginning of a nested pattern.
                SubpatternPlayEvent *e = dynamic_cast<SubpatternPlayEvent*>(*jt);
                if (e != NULL)
                {
+                  bAdvanceTime = true;
+                  stopChannel = e->column;
+
                   e->sequencer->initPosition();
                   e->sequencer->playLine();
+                  nextActives.push_back(*jt);
                }
             }
             //========================
@@ -1811,10 +1825,16 @@ class Sequencer
                      activeIt != mActiveNotesVec[stopChannel].end();
                      activeIt ++)
                {
+                  // Stop a regular note.
                   NoteEvent *note = dynamic_cast<NoteEvent*>(*activeIt);
                   if (note != NULL)
                      mJack->queueMidiEvent(MIDI_NOTE_OFF, note->pitch, 0, mCurrentTime - 1 - stopChannel,
                            getPortMap(stopChannel).channel, getPortMap(stopChannel).port);
+
+                  // Stop a pattern.
+                  SubpatternPlayEvent *seq = dynamic_cast<SubpatternPlayEvent*>(*activeIt);
+                  if (seq != NULL)
+                     seq->sequencer->silence();
                }
 
                mActiveNotesVec[stopChannel] = nextActives;
@@ -1825,21 +1845,30 @@ class Sequencer
          if (bAdvanceTime)
             mCurrentTime += mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
 
-         // Queue NOTE_OFF for the remaining notes.
+         return true;
+      }
+
+      /*****************************************************/
+      /* Stop all active notes. */
+      void silence()
+      {
          for (std::vector<EventListT>::iterator it = mActiveNotesVec.begin();
                it != mActiveNotesVec.end(); it ++)
          {
             while (!(*it).empty())
             {
                NoteEvent *n = dynamic_cast<NoteEvent*>((*it).front());
-               (*it).pop_front();
+               if (n != NULL)
+                  mJack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, mCurrentTime - 1,
+                        getPortMap(n->column).channel, getPortMap(n->column).port);
 
-               mJack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, mCurrentTime - 1,
-                     getPortMap(n->column).channel, getPortMap(n->column).port);
+               SubpatternPlayEvent *s = dynamic_cast<SubpatternPlayEvent*>((*it).front());
+               if (s != NULL)
+                  s->sequencer->silence();
+
+               (*it).pop_front();
             }
          }
-
-         return true;
       }
 
       /*****************************************************/
