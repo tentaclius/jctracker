@@ -723,8 +723,8 @@ void* bufferProcessingThread(void *arg)
 /* A parent of all possible tracker events. */
 struct Event
 {
-   virtual ~Event() {}
    unsigned column;
+   virtual ~Event() {}
 };
 
 /*******************************************************************************************/
@@ -1697,7 +1697,7 @@ class Sequencer
             if (e != NULL)
             {
                mTempo = e->tempo;
-               return true;
+               return playNextLine();
             }
          }
 
@@ -1707,7 +1707,7 @@ class Sequencer
             {
                if (e->nom > 0)
                   mQuantSize = e->nom;
-               return true;
+               return playNextLine();
             }
          }
 
@@ -1716,7 +1716,7 @@ class Sequencer
             if (e != NULL)
             {
                mCurrentTime += e->number * mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
-               return true;
+               return playNextLine();
             }
          }
 
