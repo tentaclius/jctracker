@@ -59,9 +59,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] MIDI pitch bend control.
  [v] Multiple matterns. define <name> ... end
  [ ] Rewrite Events with virtual functions noteOn(), noteOff(), control()...
- [ ] sleep/pause command.
+ [ ] wait command.
  [ ] Better error messages for the parser (with highlighting the error position).
  [ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
+ [ ] Track source file. Display the current lines while playing.
  [ ] OSC controls.
  [ ] 'define' full pattern.
  [ ] Ligato.
@@ -1133,6 +1134,15 @@ struct SubpatternPlayEvent : public Event
 };
 
 /*******************************************************************************************/
+/* Skip a number of turns. */
+struct WaitEvent : public Event
+{
+   size_t number;
+
+   WaitEvent(size_t aNumber) : number(aNumber) {}
+};
+
+/*******************************************************************************************/
 /* A structure to associate a port and a channel to a column. */
 struct PortMap
 {
@@ -1335,6 +1345,15 @@ class Parser
          if (chunk == "transpose")
          {
             iss >> mTranspose;
+            return eventList;
+         }
+
+         // Wait.
+         if (chunk == "wait")
+         {
+            size_t n;
+            iss >> n;
+            eventList.push_back(new WaitEvent(n));
             return eventList;
          }
 
@@ -1673,8 +1692,7 @@ class Sequencer
          bool bAdvanceTime = false;
 
          // Check if we have a special command.
-         {
-            // Tempo change.
+         {  // Tempo change.
             TempoEvent *e = dynamic_cast<TempoEvent*>(eventLst.front());
             if (e != NULL)
             {
@@ -1683,13 +1701,21 @@ class Sequencer
             }
          }
 
-         {
-            // Note's size change.
+         {  // Note's size change.
             BarEvent *e = dynamic_cast<BarEvent*>(eventLst.front());
             if (e != NULL)
             {
                if (e->nom > 0)
                   mQuantSize = e->nom;
+               return true;
+            }
+         }
+
+         {  // Skip n turns.
+            WaitEvent *e = dynamic_cast<WaitEvent*>(eventLst.front());
+            if (e != NULL)
+            {
+               mCurrentTime += e->number * mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
                return true;
             }
          }
@@ -1748,11 +1774,6 @@ class Sequencer
                   if (e->initValue == (unsigned)-1 || e->time == 0 || e->value == e->initValue)
                   {
                      // This is a control message to the midi. Generate single event.
-                     /*
-                        mJack->queueMidiEvent(MIDI_CONTROLLER, e->controller, e->value,
-                        mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv),
-                        getPortMap(e->column).channel, getPortMap(e->column).port);
-                     */
                      mJack->queueMidiEvent(e->midiMsg(
                               mCurrentTime + (mJack->msToNframes(60 * 1000 / mTempo / mQuantSize) * e->delay / e->delayDiv),
                               e->value,
@@ -1801,7 +1822,10 @@ class Sequencer
 
                   SubpatternPlayEvent *pattern = dynamic_cast<SubpatternPlayEvent*>(e->event);
                   if (pattern != NULL)
+                  {
+                     pattern->sequencer->setCurrentTime(mCurrentTime);
                      pattern->sequencer->playNextLine();
+                  }
                }
             }
 
@@ -1884,6 +1908,13 @@ class Sequencer
       void initPosition()
       {
          mCurrentPos = 0;
+      }
+
+      /*****************************************************/
+      /* Set the current time. */
+      void setCurrentTime(jack_nframes_t time)
+      {
+         mCurrentTime = time;
       }
 };
 
