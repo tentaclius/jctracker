@@ -1711,7 +1711,7 @@ class Sequencer
             }
          }
 
-         {  // Skip n turns.
+         {  // Skip n turns. TODO
             WaitEvent *e = dynamic_cast<WaitEvent*>(eventLst.front());
             if (e != NULL)
             {
