@@ -58,8 +58,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  [v] MIDI control ramp. $4=1..100:3/2
  [v] MIDI pitch bend control.
  [v] Multiple matterns. define <name> ... end
+ [v] wait command.
  [ ] Rewrite Events with virtual functions noteOn(), noteOff(), control()...
- [ ] wait command.
  [ ] Better error messages for the parser (with highlighting the error position).
  [ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
  [ ] Track source file. Display the current lines while playing.
@@ -719,12 +719,31 @@ void* bufferProcessingThread(void *arg)
    return NULL;
 }
 
+
+/*******************************************************************************************/
+/* A structure to return from a virtual function of an Event. */
+struct ControlFlow
+{
+   bool bTakesTime : 1;
+   bool bSilencePrevious : 1;
+   bool bNeedsStopping : 1;
+};
+
 /*******************************************************************************************/
 /* A parent of all possible tracker events. */
 struct Event
 {
    unsigned column;
    virtual ~Event() {}
+
+   virtual ControlFlow execute(JackEngine *jack, Sequencer *seq)
+   {
+      return {false, false};
+   }
+
+   virtual void stop(JackEngine *jack, Sequencer *seq)
+   {
+   }
 };
 
 /*******************************************************************************************/
@@ -909,6 +928,13 @@ struct NoteEvent : public Event
    {
       return new NoteEvent(pitch, volume, time, delay, column);
    }
+
+   /***************************************************/
+   /* Virtual functions to start/stop the note. */
+   /*
+   void stop(JackEngine *jack, Sequencer *seq);
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
+   */
 };
 
 /*******************************************************************************************/
@@ -1678,8 +1704,11 @@ class Sequencer
 
       /*****************************************************/
       /* Queue MIDI events from the current position of the sequencer. */
-      bool playNextLine()
+      bool playNextLine(jack_nframes_t aCurrentTime = 0)
       {
+         if (aCurrentTime != 0)
+            mCurrentTime = aCurrentTime;
+
          EventListT eventLst = getNextLine();
          if (eventLst.empty())
             return false;
@@ -1711,11 +1740,36 @@ class Sequencer
             }
          }
 
-         {  // Skip n turns. TODO
+         {  // Skip n turns.
             WaitEvent *e = dynamic_cast<WaitEvent*>(eventLst.front());
             if (e != NULL)
             {
-               mCurrentTime += e->number * mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
+               // Collect a list of Subpatterns.
+               std::list<SubpatternPlayEvent*> patternList;
+
+               for (std::vector<EventListT>::iterator channelIt = mActiveNotesVec.begin();
+                    channelIt != mActiveNotesVec.end();
+                    channelIt ++)
+               {
+                  EventListT eventList = *channelIt;
+                  for (EventListT::iterator eventIt = eventList.begin();
+                       eventIt != eventList.end();
+                       eventIt ++)
+                  {
+                     SubpatternPlayEvent *p = dynamic_cast<SubpatternPlayEvent*>(*eventIt);
+                     if (p != NULL)
+                        patternList.push_back(p);
+                  }
+               }
+
+               // Execute the subpatterns n times.
+               for (unsigned i = 0; i < e->number; i ++)
+               {
+                  for_each(patternList.begin(), patternList.end(), [&](SubpatternPlayEvent *p) {
+                        p->sequencer->playNextLine(mCurrentTime); });
+
+                  mCurrentTime += mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
+               }
                return playNextLine();
             }
          }
@@ -1728,8 +1782,7 @@ class Sequencer
 
             //===================================
             // Check what kinf of event we have.
-            {
-               // A regular note.
+            {  // A regular note.
                NoteEvent *e = dynamic_cast<NoteEvent*>(*jt);
                if (e != NULL)
                {
@@ -1764,8 +1817,7 @@ class Sequencer
                }
             }
 
-            {
-               // Midi control.
+            {  // Midi control.
                MidiCtlEvent *e = dynamic_cast<MidiCtlEvent*>(*jt);
                if (e != NULL)
                {
@@ -1866,7 +1918,7 @@ class Sequencer
                   // Stop a pattern.
                   SubpatternPlayEvent *seq = dynamic_cast<SubpatternPlayEvent*>(*activeIt);
                   if (seq != NULL)
-                     seq->sequencer->silence();
+                     seq->sequencer->silence(mCurrentTime);
                }
 
                mActiveNotesVec[stopChannel] = nextActives;
@@ -1882,8 +1934,11 @@ class Sequencer
 
       /*****************************************************/
       /* Stop all active notes. */
-      void silence()
+      void silence(jack_nframes_t aCurrentTime = 0)
       {
+         if (aCurrentTime != 0)
+            mCurrentTime = aCurrentTime;
+
          for (std::vector<EventListT>::iterator it = mActiveNotesVec.begin();
                it != mActiveNotesVec.end(); it ++)
          {
@@ -1910,13 +1965,77 @@ class Sequencer
          mCurrentPos = 0;
       }
 
+      PortMap& getPortMap(unsigned column)
+      {
+         return mParser->getPortMap(column);
+      }
+
       /*****************************************************/
       /* Set the current time. */
       void setCurrentTime(jack_nframes_t time)
       {
          mCurrentTime = time;
       }
+
+      jack_nframes_t getCurrentTime()
+      {
+         return mCurrentTime;
+      }
+
+      unsigned getTempo()
+      {
+         return mTempo;
+      }
+
+      void setTempo(unsigned t)
+      {
+         mTempo = t;
+      }
+
+      unsigned getQuant()
+      {
+         return mQuantSize;
+      }
+
+      void setQuant(unsigned q)
+      {
+         mQuantSize = q;
+      }
 };
+
+/***************************************************/
+/* Virtual function to schedule NOTE ON. */
+/*
+ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
+{
+   ControlFlow ret = {true, true, true};
+
+   PortMap pm = seq->getPortMap(column);
+      
+   // Queue the note on event.
+   jack->queueMidiEvent(MIDI_NOTE_ON, pitch, volume,
+         seq->getCurrentTime() + jack->msToNframes(delay)
+         + (partDiv != 0 ? (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant()) * partDelay / partDiv) : 0)
+         + column,
+         pm.channel, pm.port);
+
+   if (!endless && (time != 0 || partTime != 0))
+   {
+      // If the note has specific time, schedule the off event right now.
+      ret.bNeedsStopping = false;
+      jack->queueMidiEvent(MIDI_NOTE_OFF, pitch, volume,
+            seq->getCurrentTime() + jack->msToNframes(delay)
+            + (partDiv != 0 ? (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant())
+                  * partDelay / partDiv) : 0)
+            + jack->msToNframes(time)
+            + (partDiv != 0 ? (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant())
+                  * partTime / partDiv) : 0) - 2,
+            pm.channel, pm.port);
+   }
+
+   return ret;
+}
+*/
 
 /*****************************************************************************************************/
 /* Read the data from the sequencer and queue the midi events to Jack */
