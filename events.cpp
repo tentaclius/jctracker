@@ -1,14 +1,15 @@
 #include "events.h"
 
+#include <stdio.h>
 #include <assert.h>
 
 /*****************************************************************************************************/
 /* Event. */
-virtual ControlFlow Event::execute(JackEngine *jack, Sequencer *seq)
+ControlFlow Event::execute(JackEngine *jack, Sequencer *seq)
 {
    return {false, false};
 }
-virtual void Event::stop(JackEngine *jack, Sequencer *seq)
+void Event::stop(JackEngine *jack, Sequencer *seq)
 {
 }
 

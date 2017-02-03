@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "sequencer.h"
 #include "parser.h"
 #include "events.h"
@@ -365,7 +367,7 @@ void Sequencer::setQuant(unsigned q)
    mQuantSize = q;
 }
 
-void Sequencer::silence(jack_nframes_t aCurrentTime = 0)
+void Sequencer::silence(jack_nframes_t aCurrentTime)
 {
    if (aCurrentTime != 0)
       mCurrentTime = aCurrentTime;

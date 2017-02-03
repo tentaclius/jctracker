@@ -1,7 +1,13 @@
 #ifndef SEQUENCER_H
 #define SEQUENCER_H
 
+#include <vector>
+#include <map>
+
+#include "common.h"
+#include "events.h"
 #include "parser.h"
+#include "jackengine.h"
 
 /*******************************************************************************************/
 /* Interpret and process the pattern line by line. */

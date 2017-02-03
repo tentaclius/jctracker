@@ -1,5 +1,9 @@
 #include "midictlevent.h"
 
+#include <sstream>
+
+#include "common.h"
+
 MidiCtlEvent::MidiCtlEvent()
 {
    type = CTLTYPE_CONTROL;
@@ -17,7 +21,7 @@ MidiCtlEvent::MidiCtlEvent()
 
 /*****************************************************************************************************/
 /* Construct the control by parsing the string. */
-MidiCtlEvent::MidiCtlEvent(const std::string &str, unsigned clmn = 0)
+MidiCtlEvent::MidiCtlEvent(const std::string &str, unsigned clmn)
 {
    type = CTLTYPE_CONTROL;
    column = clmn;

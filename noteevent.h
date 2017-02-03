@@ -49,4 +49,4 @@ struct NoteEvent : public Event
    */
 };
 
-#endif NOTEEVENT_H
+#endif

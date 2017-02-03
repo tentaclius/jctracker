@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "events.h"
+#include "midimessage.h"
 
 /*******************************************************************************************/
 /* A message to a midi controller. */

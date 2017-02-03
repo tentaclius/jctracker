@@ -1,11 +1,13 @@
 #include "parser.h"
 
 #include <sstream>
+#include <climits>
 
 #include <assert.h>
 
 #include "jackengine.h"
 #include "events.h"
+#include "midictlevent.h"
 
 Parser::Parser(std::map<std::string, Sequencer*> *subseq, size_t chan)
 {
@@ -367,7 +369,7 @@ PortMap& Parser::getPortMap(unsigned column)
    return mColumnMap[column];
 }
 
-PortMap::PortMap(unsigned ch, jack_port_t *p);
+PortMap::PortMap(unsigned ch, jack_port_t *p)
 {
    channel = ch;
    port = p;

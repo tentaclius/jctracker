@@ -1,11 +1,11 @@
 #ifndef EVENTS_H
-#define EVETNS_H
+#define EVENTS_H
 
+#include <iostream>
 #include <list>
 
-#include "jackengine.h"
-#include "sequencer.h"
-
+class JackEngine;
+class Sequencer;
 
 /*******************************************************************************************/
 /* A structure to return from a virtual function of an Event. */
@@ -109,7 +109,7 @@ struct WaitEvent : public Event
 {
    size_t number;
 
-   WaitEvent(size_t aNumber) : number(aNumber);
+   WaitEvent(size_t aNumber);
 };
 
 typedef std::list<Event*> EventListT;

@@ -175,6 +175,39 @@ NoteEvent* NoteEvent::clone()
 }
 
 /***************************************************/
+/* Virtual function to schedule NOTE ON. */
+/*
+ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
+{
+   ControlFlow ret = {true, true, true};
+
+   PortMap pm = seq->getPortMap(column);
+      
+   // Queue the note on event.
+   jack->queueMidiEvent(MIDI_NOTE_ON, pitch, volume,
+         seq->getCurrentTime() + jack->msToNframes(delay)
+         + (partDiv != 0 ? (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant()) * partDelay / partDiv) : 0)
+         + column,
+         pm.channel, pm.port);
+
+   if (!endless && (time != 0 || partTime != 0))
+   {
+      // If the note has specific time, schedule the off event right now.
+      ret.bNeedsStopping = false;
+      jack->queueMidiEvent(MIDI_NOTE_OFF, pitch, volume,
+            seq->getCurrentTime() + jack->msToNframes(delay)
+            + (partDiv != 0 ? (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant())
+                  * partDelay / partDiv) : 0)
+            + jack->msToNframes(time)
+            + (partDiv != 0 ? (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant())
+                  * partTime / partDiv) : 0) - 2,
+            pm.channel, pm.port);
+   }
+
+   return ret;
+}
+*/
+/***************************************************/
 /* Virtual functions to start/stop the note. */
 /*
    void stop(JackEngine *jack, Sequencer *seq);

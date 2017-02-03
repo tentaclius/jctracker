@@ -16,6 +16,8 @@
 #define MIDI_HEAP_SIZE                 1024
 #define RINGBUFFER_SIZE                1024
 
+typedef jack_default_audio_sample_t sample_t;
+
 /*******************************************************************************************/
 /* Manage Jack connection and hide specific objects. Singleton. */
 class JackEngine

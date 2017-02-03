@@ -1,8 +1,6 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "sequencer.h"
-
 #include <vector>
 #include <map>
 #include <list>
@@ -15,6 +13,8 @@
 #include "events.h"
 #include "noteevent.h"
 
+
+/* Forward declaration. */
 class Sequencer;
 
 /*******************************************************************************************/
@@ -38,7 +38,7 @@ class Parser
    unsigned                mVolume;
    std::vector<int>       *mSigns;
    std::map<std::string, std::string>
-      mAliases;
+                           mAliases;
    std::vector<PortMap>    mColumnMap;
    int                     mTranspose;
    size_t                  mLinePos;
@@ -61,7 +61,6 @@ class Parser
    /* Parse a given line (with one or multiple directives or patterns). */
    EventListT parseLine(std::string line);
 
-   /***************************************************/
    /* Return a port to which the column matches. */
    PortMap& getPortMap(unsigned column);
 };
