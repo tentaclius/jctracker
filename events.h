@@ -114,5 +114,4 @@ struct WaitEvent : public Event
 
 typedef std::list<Event*> EventListT;
 
-
 #endif

@@ -43,10 +43,8 @@ struct NoteEvent : public Event
 
    /***************************************************/
    /* Virtual functions to start/stop the note. */
-   /*
    void stop(JackEngine *jack, Sequencer *seq);
    ControlFlow execute(JackEngine *jack, Sequencer *seq);
-   */
 };
 
 #endif

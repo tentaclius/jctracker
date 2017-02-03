@@ -2,6 +2,9 @@
 
 #include <sstream>
 
+#include "jackengine.h"
+#include "sequencer.h"
+
 NoteEvent::NoteEvent(unsigned n, unsigned v, uint64_t tm, uint64_t dl, unsigned col)
    : pitch(n)
    , volume(v)
@@ -176,7 +179,6 @@ NoteEvent* NoteEvent::clone()
 
 /***************************************************/
 /* Virtual function to schedule NOTE ON. */
-/*
 ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
 {
    ControlFlow ret = {true, true, true};
@@ -206,10 +208,12 @@ ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
 
    return ret;
 }
-*/
-/***************************************************/
-/* Virtual functions to start/stop the note. */
-/*
-   void stop(JackEngine *jack, Sequencer *seq);
-   ControlFlow execute(JackEngine *jack, Sequencer *seq);
-   */
+
+void NoteEvent::stop(JackEngine *jack, Sequencer *seq)
+{
+   if (endless || time != 0 || partTime != 0)
+   {
+      jack->queueMidiEvent(MIDI_NOTE_OFF, pitch, 0, seq->getCurrentTime() - 1 - column,
+            seq->getPortMap(column).channel, seq->getPortMap(column).port);
+   }
+}
