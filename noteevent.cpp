@@ -16,7 +16,7 @@ NoteEvent::NoteEvent(unsigned n, unsigned v, uint64_t tm, uint64_t dl, unsigned 
    , partTime(0)
    , partDiv(1)
    , natural(false)
-     , endless(false)
+   , endless(false)
 {
    column = col;
 }
