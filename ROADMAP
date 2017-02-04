@@ -1,0 +1,43 @@
+[v] Set up jackd client skeleton.
+[v] Try sending few single note_on note_off midi events to the gJack port in process() callback.
+[v] Signal handler to send midi stop all event.
+[v] Write the sequencer: note_on at the note appearing; note_off at the next note in the row.
+[v] Pedaled notes.
+[v] Sort upcoming midi events by time with a heap.
+[v] Find a proper way to handle delayed and timed notes.
+[v] Create event vectors with pre-defined size.
+[v] Note playing time.
+[v] Process empty notes, default notes and other templates.
+[v] Directives: volume, default, tempo etc.
+[v] Handle loops.
+[v] Separate threads for different tasks.
+[v] Implement bar event and sizes support and tempo changes.
+[v] Transposition ("transpose 20")..
+[v] Initial signs (sharp/flat) applied to all notes.
+[v] Aliases for the notes with _hash_tables_!
+[v] Proper time management.
+[v] Make the transposition static.
+[v] Ports and channels assignment.
+[v] Automatic connection.
+[v] Move the patterns and the player into separate classes.
+[v] Note length and timing in parts of current note length.
+[v] Modifiers to work for aliases.
+[-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
+[v] Allow several notes for the channel.
+[v] MIDI control messages.
+[v] MIDI control ramp. $4=1..100:3/2
+[v] MIDI pitch bend control.
+[v] Multiple matterns. define <name> ... end
+[v] wait command.
+[ ] Rewrite Events with virtual functions noteOn(), noteOff(), control()...
+[ ] Better error messages for the parser (with highlighting the error position).
+[ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
+[ ] Track source file. Display the current lines while playing.
+[ ] OSC controls.
+[ ] 'define' full pattern.
+[ ] Ligato.
+[ ] Transposition separately for each column.
+[ ] Unicode sharp/flat/natural signs.
+[ ] Add deliberate NOTE_END pattern.
+[ ] Jack transport.
+[ ] Input MIDI port to record notes from a MIDI keyboard.

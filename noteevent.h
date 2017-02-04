@@ -5,8 +5,6 @@
 
 #include <stdint.h>
 
-#include "events.h"
-
 /*******************************************************************************************/
 /* A note to be played. */
 struct NoteEvent : public Event

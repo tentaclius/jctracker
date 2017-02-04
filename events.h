@@ -114,4 +114,7 @@ struct WaitEvent : public Event
 
 typedef std::list<Event*> EventListT;
 
+#include "noteevent.h"
+#include "midictlevent.h"
+
 #endif
