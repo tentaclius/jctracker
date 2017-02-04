@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Swap two elements with the given indicies. */
 inline void MidiHeap::swap(size_t i, size_t j)
 {
@@ -12,28 +12,28 @@ inline void MidiHeap::swap(size_t i, size_t j)
    mArray[j] = t;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Return an index of the element which is parent to the element with the given index. */
 size_t MidiHeap::parent(size_t i)
 {
    return (i + 1) / 2 - 1;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Return an index of the left child of the given index element. */
 inline size_t MidiHeap::lchild(size_t i)
 {
    return (i + 1) * 2 - 1;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Return an index of the right child of the given index element. */
 inline size_t MidiHeap::rchild(size_t i)
 {
    return (i + 1) * 2;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Return an index of the smallest element of two given index elements. */
 inline size_t MidiHeap::imin(size_t i, size_t j)
 {
@@ -56,7 +56,7 @@ inline size_t MidiHeap::imin(size_t i, size_t j)
       return j;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Rearrange the buffer to maintain the order. */
 void MidiHeap::bubbleDown(size_t i)
 {
@@ -70,7 +70,7 @@ void MidiHeap::bubbleDown(size_t i)
    }
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 MidiHeap::MidiHeap(size_t s)
 {
    mArray = new MidiMessage[s];
@@ -78,14 +78,14 @@ MidiHeap::MidiHeap(size_t s)
    pthread_mutex_init(&mMutex, NULL);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 MidiHeap::~MidiHeap()
 {
    delete mArray;
    pthread_mutex_destroy(&mMutex);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Add a new element while maintaining the order.
    The function locks until there is a space in the buffer. */
 void MidiHeap::insert(MidiMessage &msg)
@@ -108,7 +108,7 @@ void MidiHeap::insert(MidiMessage &msg)
    pthread_mutex_unlock(&mMutex);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Pop the minimal element.
    The function locks until there is an element to read. */
 MidiMessage MidiHeap::popMin()
@@ -129,7 +129,7 @@ MidiMessage MidiHeap::popMin()
    return min;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Look the minimal element without removing it from the buffer.
    The function locks until there is an element to look at. */
 MidiMessage MidiHeap::peekMin()
@@ -146,7 +146,7 @@ MidiMessage MidiHeap::peekMin()
    return min;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* The number of elements available in the buffer. */
 size_t MidiHeap::count()
 {

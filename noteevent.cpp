@@ -5,6 +5,8 @@
 #include "jackengine.h"
 #include "sequencer.h"
 
+/*****************************************************************************************************/
+/* Parametrized constructor. */
 NoteEvent::NoteEvent(unsigned n, unsigned v, uint64_t tm, uint64_t dl, unsigned col)
    : pitch(n)
    , volume(v)
@@ -19,12 +21,14 @@ NoteEvent::NoteEvent(unsigned n, unsigned v, uint64_t tm, uint64_t dl, unsigned 
    column = col;
 }
 
+/*****************************************************************************************************/
+/* Empty constructor. */
 NoteEvent::NoteEvent()
 {
    NoteEvent(0,64,0,0,0);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Constructor that parses the note from the string. */
 NoteEvent::NoteEvent(const std::string &buf, unsigned aColumn)
 {
@@ -155,7 +159,7 @@ NoteEvent::NoteEvent(const std::string &buf, unsigned aColumn)
    }
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Set the parameters of the current midi message. */
 void NoteEvent::set(unsigned n, unsigned v, uint64_t tm, uint64_t dl)
 {
@@ -165,19 +169,19 @@ void NoteEvent::set(unsigned n, unsigned v, uint64_t tm, uint64_t dl)
    delay = dl;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 NoteEvent::~NoteEvent()
 {
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Return a new instance of the same data. */
 NoteEvent* NoteEvent::clone()
 {
    return new NoteEvent(pitch, volume, time, delay, column);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Virtual function to schedule NOTE ON. */
 ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
 {
@@ -209,6 +213,8 @@ ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
    return ret;
 }
 
+/*****************************************************************************************************/
+/* Virtual function to stop the event. Queues NOTE_OFF. */
 void NoteEvent::stop(JackEngine *jack, Sequencer *seq)
 {
    if (endless || time != 0 || partTime != 0)

@@ -6,6 +6,8 @@
 #include "noteevent.h"
 #include "midictlevent.h"
 
+/*****************************************************************************************************/
+/* Constructor. */
 Sequencer::Sequencer(JackEngine *j)
 {
    mJack = j;
@@ -16,11 +18,15 @@ Sequencer::Sequencer(JackEngine *j)
    mParser = new Parser(&mSubSeqMap);
 }
 
+/*****************************************************************************************************/
+/* Destructor. */
 Sequencer::~Sequencer()
 {
    delete mParser;
 }
 
+/*****************************************************************************************************/
+/* Read a pattern from a stringstream. */
 void Sequencer::readFromStream(std::istream &ss)
 {
    std::string line;
@@ -64,6 +70,8 @@ void Sequencer::readFromStream(std::istream &ss)
    }
 }
 
+/*****************************************************************************************************/
+/* Play one line and increment the internal position. */
 bool Sequencer::playNextLine(jack_nframes_t aCurrentTime)
 {
    if (aCurrentTime != 0)
@@ -292,6 +300,8 @@ bool Sequencer::playNextLine(jack_nframes_t aCurrentTime)
    return true;
 }
 
+/*****************************************************************************************************/
+/* Returns a list of events and increments internal position pointer. */
 EventListT Sequencer::getNextLine()
 {
    // Check if we reached the end. Return empty vector if so.
@@ -327,46 +337,64 @@ EventListT Sequencer::getNextLine()
       return mSong[mCurrentPos ++];
 }
 
+/*****************************************************************************************************/
+/* Set playing position to zero. */
 void Sequencer::initPosition()
 {
    mCurrentPos = 0;
 }
 
+/*****************************************************************************************************/
+/* Return a column to port mapping. */
 PortMap& Sequencer::getPortMap(unsigned column)
 {
    return mParser->getPortMap(column);
 }
 
+/*****************************************************************************************************/
+/* Set the current time frame. */
 void Sequencer::setCurrentTime(jack_nframes_t time)
 {
    mCurrentTime = time;
 }
 
+/*****************************************************************************************************/
+/* Return the current time frame. */
 jack_nframes_t Sequencer::getCurrentTime()
 {
    return mCurrentTime;
 }
 
+/*****************************************************************************************************/
+/* Getter for mTempo. */
 unsigned Sequencer::getTempo()
 {
    return mTempo;
 }
 
+/*****************************************************************************************************/
+/* Setter for mTempo. */
 void Sequencer::setTempo(unsigned t)
 {
    mTempo = t;
 }
 
+/*****************************************************************************************************/
+/* Getter for mQuantSize. */
 unsigned Sequencer::getQuant()
 {
    return mQuantSize;
 }
 
+/*****************************************************************************************************/
+/* Setter for mQuantSize. */
 void Sequencer::setQuant(unsigned q)
 {
    mQuantSize = q;
 }
 
+/*****************************************************************************************************/
+/* Silence currently active events. */
 void Sequencer::silence(jack_nframes_t aCurrentTime)
 {
    if (aCurrentTime != 0)

@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Construct the message with the given midi data. */
 MidiMessage::MidiMessage(int b0, int b1, int b2, jack_nframes_t tm, unsigned channel, jack_port_t *p)
 {
@@ -35,7 +35,7 @@ MidiMessage::MidiMessage(int b0, int b1, int b2, jack_nframes_t tm, unsigned cha
    port = p;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Create the message with null data */
 MidiMessage::MidiMessage()
 {

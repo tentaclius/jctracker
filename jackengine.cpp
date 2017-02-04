@@ -7,7 +7,7 @@
 
 #include "common.h"
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* A thread for moving the midi events from the heap and to the ringbuffer */
 void* bufferProcessingThread(void *arg)
 {
@@ -26,7 +26,7 @@ void* bufferProcessingThread(void *arg)
    return NULL;
 }
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* Jack main processing callback. */
 int jack_process_cb(jack_nframes_t nframes, void *arg)
 {
@@ -102,7 +102,7 @@ int jack_process_cb(jack_nframes_t nframes, void *arg)
    return 0;      
 }
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* Jack shutdown callback. */
 void jack_shutdown_cb(void *arg)
 {
@@ -110,7 +110,7 @@ void jack_shutdown_cb(void *arg)
    jack->shutdown();
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Write the midi message into the ringbuffer which is processed by jack callback in its turn. */
 void JackEngine::writeMidiData(MidiMessage theMessage)
 {
@@ -122,26 +122,27 @@ void JackEngine::writeMidiData(MidiMessage theMessage)
    return;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Hide the constructor, as it is a singleton. */
 JackEngine::JackEngine()
 {
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 JackEngine::~JackEngine()
 {
    delete mMidiHeap;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
+/* Return an instance of the singleton. */
 JackEngine* JackEngine::instance()
 {
    static JackEngine *inst = new JackEngine();
    return inst;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Initialization and activation of jack interface. */
 void JackEngine::init()
 {
@@ -177,7 +178,7 @@ void JackEngine::init()
    pthread_create(&mMidiWriteThread, NULL, bufferProcessingThread, this);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Register an output port. */
 jack_port_t* JackEngine::registerOutputPort(std::string name)
 {
@@ -193,14 +194,14 @@ jack_port_t* JackEngine::registerOutputPort(std::string name)
    return p;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Connect to a port. */
 int JackEngine::connectPort(jack_port_t *port, std::string destination)
 {
    return jack_connect(mClient, jack_port_name(port), destination.c_str());
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Shutdown the jack interface. */
 void JackEngine::shutdown()
 {
@@ -209,47 +210,50 @@ void JackEngine::shutdown()
    jack_client_close(mClient);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Convert microsecond time to jack nframes. */
 jack_nframes_t JackEngine::msToNframes(uint64_t ms)
 {
    return ms * mSampleRate / 1000;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Return the current time in nframes. */
 jack_nframes_t JackEngine::currentFrameTime()
 {
    return jack_frame_time(mClient);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Is there are unprocessed midi events. */
 bool JackEngine::hasPendingEvents()
 {
    return mMidiHeap->count() > 0;
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Put a midi message into the heap. */
 void JackEngine::queueMidiEvent(MidiMessage &message)
 {
    mMidiHeap->insert(message);
 }
+
+/*****************************************************************************************************/
+/* Put a midi message into the midi heap. */
 void JackEngine::queueMidiEvent(MidiMessage message)
 {
    mMidiHeap->insert(message);
 }
 
-/***************************************************/
-/* Put a midi message into the heap. */
+/*****************************************************************************************************/
+/* Construct and put a midi message into the heap. */
 void JackEngine::queueMidiEvent(unsigned char b0, unsigned char b1, unsigned char b2, jack_nframes_t time, unsigned channel, jack_port_t *port)
 {
    MidiMessage msg (b0, b1, b2, time, channel, port);
    mMidiHeap->insert(msg);
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Send a control midi message to stop all sounds. */
 void JackEngine::stopSounds()
 {

@@ -13,7 +13,7 @@ void Event::stop(JackEngine *jack, Sequencer *seq)
 {
 }
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* SkipEvent. */
 SkipEvent::SkipEvent(unsigned col)
 {
@@ -21,7 +21,7 @@ SkipEvent::SkipEvent(unsigned col)
 }
 SkipEvent::~SkipEvent() {}
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* BarEvent. */
 BarEvent::BarEvent(unsigned n, unsigned d) : nom(n), div(d)
 {}
@@ -30,41 +30,41 @@ BarEvent::BarEvent(unsigned n, unsigned d, unsigned pitch) : nom(n), div(d)
 BarEvent::~BarEvent()
 {}
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* Tempo changing command. */
 TempoEvent::TempoEvent(unsigned t) : tempo(t) {}
 TempoEvent::~TempoEvent() {}
 
-/*******************************************************************************************/
-/* The previous note will not be muted. */
+/*****************************************************************************************************/
+/* PedalEvent. The previous note will not be muted. */
 PedalEvent::PedalEvent(unsigned c, Event *anEvent)
 {
    assert(anEvent != NULL);
    column = c;
    event = anEvent;
 }
-
 PedalEvent::~PedalEvent() {}
 
-/*******************************************************************************************/
+/*****************************************************************************************************/
 /* Beginning of a loop. */
 LoopEvent::LoopEvent(unsigned n)
 {
    count = n;
 }
-
 LoopEvent::LoopEvent()
 {
    count = (unsigned)-1;
 }
 
-/*******************************************************************************************/
-/* Start of a nested pattern definition. */
+/*****************************************************************************************************/
+/* SubpatternBeginEvent. Start of a nested pattern definition. */
 SubpatternBeginEvent::SubpatternBeginEvent(std::string aName)
 {
    name = aName;
 }
 
+/*****************************************************************************************************/
+/* Plays a nested pattern. */
 SubpatternPlayEvent::SubpatternPlayEvent(Sequencer *aSequencer, unsigned aColumn)
 {
    assert(aSequencer != NULL);
@@ -72,4 +72,6 @@ SubpatternPlayEvent::SubpatternPlayEvent(Sequencer *aSequencer, unsigned aColumn
    column = aColumn;
 }
 
+/*****************************************************************************************************/
+/* A message to skip a number of turns. */
 WaitEvent::WaitEvent(size_t aNumber) : number(aNumber) {}

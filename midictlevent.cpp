@@ -4,6 +4,8 @@
 
 #include "common.h"
 
+/*****************************************************************************************************/
+/* Constructor. */
 MidiCtlEvent::MidiCtlEvent()
 {
    type = CTLTYPE_CONTROL;
@@ -90,7 +92,7 @@ MidiCtlEvent::MidiCtlEvent(const std::string &str, unsigned clmn)
    }
 }
 
-/***************************************************/
+/*****************************************************************************************************/
 /* Generate a MIDI message that corresponds to the object. */
 MidiMessage MidiCtlEvent::midiMsg(jack_nframes_t time, unsigned value, unsigned channel, jack_port_t *port)
 {

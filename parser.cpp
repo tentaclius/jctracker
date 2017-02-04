@@ -9,6 +9,8 @@
 #include "events.h"
 #include "midictlevent.h"
 
+/*****************************************************************************************************/
+/* Constructor. */
 Parser::Parser(std::map<std::string, Sequencer*> *subseq, size_t chan)
 {
    assert(subseq != NULL);
@@ -23,11 +25,15 @@ Parser::Parser(std::map<std::string, Sequencer*> *subseq, size_t chan)
    mLinePos = 0;
 }
 
+/*****************************************************************************************************/
+/* Destructor. */
 Parser::~Parser()
 {
    delete mSigns;
 }
 
+/*****************************************************************************************************/
+/* Trim a text string from both ends. */
 std::string Parser::trim(std::string s)
 {
    if (s.empty())
@@ -41,11 +47,15 @@ std::string Parser::trim(std::string s)
    else return s.substr(a, b - a + 1);
 }
 
+/*****************************************************************************************************/
+/* Setter for subsequent map. */
 void Parser::setSubseqMap(std::map<std::string, Sequencer*> *subseq)
 {
    mSubSeqMap = subseq;
 }
 
+/*****************************************************************************************************/
+/* Parse a text line. */
 EventListT Parser::parseLine(std::string line)
 {
    JackEngine *jack = JackEngine::instance();
@@ -361,6 +371,8 @@ EventListT Parser::parseLine(std::string line)
    return eventList;
 }
 
+/*****************************************************************************************************/
+/* Return the column to port mapping. */
 PortMap& Parser::getPortMap(unsigned column)
 {
    static PortMap dfltMap (0, NULL);
@@ -369,12 +381,16 @@ PortMap& Parser::getPortMap(unsigned column)
    return mColumnMap[column];
 }
 
+/*****************************************************************************************************/
+/* Constructor for PortMap. */
 PortMap::PortMap(unsigned ch, jack_port_t *p)
 {
    channel = ch;
    port = p;
 }
 
+/*****************************************************************************************************/
+/* Empty constructor for PortMap. */
 PortMap::PortMap()
 {
    channel = 0;
