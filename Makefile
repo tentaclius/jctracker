@@ -16,6 +16,9 @@ clear:
 	rm -f jctracker
 	rm -f *.o
 
+clean:
+	rm -f *.o
+
 re: clear $(BIN)
 
 prod: tracker.cpp Makefile
