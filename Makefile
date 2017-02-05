@@ -1,16 +1,15 @@
 BIN  = jctracker
 LIBS = -ljack -lpthread -lm
-OPTS_DEV = -Wall -std=c++11 -g -DDEBUG
-OPTS_PROD = -Wall -std=c++11
+OPTS = -Wall -std=c++11 -g -DDEBUG
 
 OBJECTS = common.o events.o jackengine.o midictlevent.o midiheap.o midimessage.o noteevent.o parser.o sequencer.o
 COMMON_DEPS = Makefile common.h
 
 $(BIN): main.cpp $(COMMON_DEPS) $(OBJECTS)
-	$(CXX) main.cpp -o $@ $(OBJECTS) $(LIBS) $(OPTS_DEV) 
+	$(CXX) main.cpp -o $@ $(OBJECTS) $(LIBS) $(OPTS) 
 
 %.o: %.cpp %.h $(COMMON_DEPS)
-	$(CXX) -c $< $(OPTS_DEV)
+	$(CXX) -c $< $(OPTS)
 
 clear:
 	rm -f jctracker
@@ -20,6 +19,3 @@ clean:
 	rm -f *.o
 
 re: clear $(BIN)
-
-prod: tracker.cpp Makefile
-	$(CXX) tracker.cpp -o $(BIN).x86_64 $(LIBS) $(OPTS_PROD)
