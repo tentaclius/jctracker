@@ -37,13 +37,12 @@ class Sequencer
       /* Destructor. */
       ~Sequencer();
 
-      // Read the data from the stream.
+      /* Read the data from the stream. */
       void readFromStream(std::istream &ss);
 
       /* Get the vector of the next events. */
       EventListT getNextLine();
 
-      /*****************************************************/
       /* Queue MIDI events from the current position of the sequencer. */
       bool playNextLine(jack_nframes_t aCurrentTime = 0);
 
@@ -58,17 +57,25 @@ class Sequencer
       /* Set the current time. */
       void setCurrentTime(jack_nframes_t time);
 
+      /* Return current sequencer's time. */
       jack_nframes_t getCurrentTime();
+
+      /* Advance current sequencer's time. */
       void advanceTime(jack_nframes_t tm);
 
+      /* Get tempo. */
       unsigned getTempo();
 
+      /* Set tempo. */
       void setTempo(unsigned t);
 
+      /* Get quant size. */
       unsigned getQuant();
 
+      /* Set quant size. */
       void setQuant(unsigned q);
 
+      /* Get the vector of all active events. Vector's index corresponds to column. */
       std::vector<EventListT>& getActiveNotes();
 };
 

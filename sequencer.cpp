@@ -373,7 +373,7 @@ EventListT Sequencer::getNextLine()
          // The beginning of a loop; push the starting point to the loop stack.
          mLoopStack.push_back(std::pair<int, unsigned>(lp->count, mCurrentPos));
 
-      else if (elp != NULL)
+      else
       {
          // End of the loop; move the pointer to the beginning of the loop.
          if (mLoopStack.size() > 0)
