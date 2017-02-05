@@ -25,6 +25,9 @@ struct MidiCtlEvent : public Event
 
    /* Generate a MIDI message that corresponds to the object. */
    MidiMessage midiMsg(jack_nframes_t time, unsigned value, unsigned channel, jack_port_t *port);
+
+   /* Virtual functions to schedule messages. */
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
 };
 
 #endif

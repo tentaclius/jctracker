@@ -3,6 +3,8 @@
 #include <sstream>
 
 #include "common.h"
+#include "jackengine.h"
+#include "sequencer.h"
 
 /*****************************************************************************************************/
 /* Constructor. */
@@ -113,4 +115,45 @@ MidiMessage MidiCtlEvent::midiMsg(jack_nframes_t time, unsigned value, unsigned 
    }
 
    return MidiMessage(b0, b1, b2, time, channel, port);
+}
+
+/*****************************************************************************************************/
+/* Virtual function to schedule NOTE ON. */
+ControlFlow MidiCtlEvent::execute(JackEngine *jack, Sequencer *seq)
+{
+   ControlFlow ret = {true, true, false};
+
+   PortMap pm = seq->getPortMap(column);
+
+   if (initValue == (unsigned)-1 || time == 0 || value == initValue)
+   {
+      // This is a control message to the midi. Generate single event.
+      jack->queueMidiEvent(midiMsg(
+               seq->getCurrentTime() + (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant()) * delay / delayDiv),
+               value,
+               pm.channel, pm.port));
+   }
+   else
+   {
+      // This is ramp. Need to generate a bunch of messages.
+      unsigned timeStep = (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant()) * time / delayDiv)
+         / abs((int)initValue - value);
+      for (unsigned i = initValue;
+            (value > initValue) ? (i < value) : (i > value);
+            i += (value > initValue ? step : - step))
+      {
+         jack->queueMidiEvent(midiMsg(
+                  seq->getCurrentTime() + (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant()) * delay / delayDiv)
+                  + timeStep * abs((int)initValue - i),
+                  i,
+                  pm.channel, pm.port));
+      }
+      jack->queueMidiEvent(midiMsg(
+               seq->getCurrentTime() + (jack->msToNframes(60 * 1000 / seq->getTempo() / seq->getQuant()) * delay / delayDiv)
+               + timeStep * abs((int)initValue - value),
+               value,
+               pm.channel, pm.port));
+   }
+
+   return ret;
 }

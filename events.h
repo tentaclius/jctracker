@@ -25,6 +25,7 @@ struct Event
 
    virtual ControlFlow execute(JackEngine *jack, Sequencer *seq);
    virtual void stop(JackEngine *jack, Sequencer *seq);
+   virtual void sustain(JackEngine *jack, Sequencer *seq);
 };
 
 /*******************************************************************************************/
@@ -33,6 +34,8 @@ struct SkipEvent : public Event
 {
    SkipEvent(unsigned col);
    ~SkipEvent();
+
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
 };
 
 /*******************************************************************************************/
@@ -44,6 +47,8 @@ struct BarEvent : public Event
    BarEvent(unsigned n, unsigned d);
    BarEvent(unsigned n, unsigned d, unsigned pitch);
    ~BarEvent();
+
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
 };
 
 /*******************************************************************************************/
@@ -54,6 +59,8 @@ struct TempoEvent : public Event
 
    TempoEvent(unsigned t);
    ~TempoEvent();
+
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
 };
 
 /*******************************************************************************************/
@@ -65,6 +72,8 @@ struct PedalEvent : public Event
    PedalEvent(unsigned c, Event *anEvent);
 
    ~PedalEvent();
+
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
 };
 
 /*******************************************************************************************/
@@ -101,6 +110,10 @@ struct SubpatternPlayEvent : public Event
    Sequencer *sequencer;
 
    SubpatternPlayEvent(Sequencer *aSequencer, unsigned aColumn);
+
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
+   void stop(JackEngine *jack, Sequencer *seq);
+   void sustain(JackEngine *jack, Sequencer *seq);
 };
 
 /*******************************************************************************************/
@@ -110,6 +123,8 @@ struct WaitEvent : public Event
    size_t number;
 
    WaitEvent(size_t aNumber);
+
+   ControlFlow execute(JackEngine *jack, Sequencer *seq);
 };
 
 typedef std::list<Event*> EventListT;

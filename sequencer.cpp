@@ -74,16 +74,72 @@ void Sequencer::readFromStream(std::istream &ss)
 /* Play one line and increment the internal position. */
 bool Sequencer::playNextLine(jack_nframes_t aCurrentTime)
 {
+   std::vector<EventListT> nextActives (mActiveNotesVec.size());
+
+   bool bAdvanceTime = false;
+
+   if (aCurrentTime != 0)
+      mCurrentTime = aCurrentTime;
+
+   trace("current time: %llu\n", (long long unsigned)mCurrentTime);
+
+   while (!bAdvanceTime)
+   {
+      EventListT eventLst = getNextLine();
+      if (eventLst.empty())
+         return false;
+
+      // Start new notes. Loop through the event list.
+      for (EventListT::iterator jt = eventLst.begin(); jt != eventLst.end(); jt ++)
+      {
+         Event *event = *jt;
+
+         // Execute the event.
+         ControlFlow type = event->execute(mJack, this);
+
+         // Expand active notes vector if the channel number is bigger.
+         if ((type.bNeedsStopping || type.bSilencePrevious) && event->column >= nextActives.size())
+         {
+            mActiveNotesVec.resize(event->column + 1);
+            nextActives.resize(event->column + 1);
+         }
+
+         // If the event needs to be stopped at the next line, add it to the list.
+         if (type.bNeedsStopping)
+            nextActives[event->column].push_back(event);
+
+         // Stop previous note(s) on this channel.
+         if (type.bSilencePrevious)
+         {
+            for (Event *e : mActiveNotesVec[event->column])
+               e->stop(mJack, this);
+            mActiveNotesVec[event->column].clear();
+         }
+
+         bAdvanceTime |= type.bTakesTime;
+      }
+
+      // Merge active note lists.
+      for (size_t i = 0; i < mActiveNotesVec.size(); i ++)
+      {
+         mActiveNotesVec[i].insert(mActiveNotesVec[i].end(),
+               nextActives[i].begin(), nextActives[i].end());
+      }
+
+      // Advance the current time.
+      if (bAdvanceTime)
+         mCurrentTime += mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
+   }
+
+   return true;
+}
+/*{
    if (aCurrentTime != 0)
       mCurrentTime = aCurrentTime;
 
    EventListT eventLst = getNextLine();
    if (eventLst.empty())
       return false;
-
-   // The list to keep track of notes that should be muted at the next iteration.
-   // Replaces activeList at the end of this iter.
-   std::list<NoteEvent*> nextActive;
 
    // The time should be advanced if there is a time taking event in the list.
    bool bAdvanceTime = false;
@@ -298,7 +354,7 @@ bool Sequencer::playNextLine(jack_nframes_t aCurrentTime)
       mCurrentTime += mJack->msToNframes(60 * 1000 / mTempo / mQuantSize);
 
    return true;
-}
+}*/
 
 /*****************************************************************************************************/
 /* Returns a list of events and increments internal position pointer. */
@@ -417,4 +473,14 @@ void Sequencer::silence(jack_nframes_t aCurrentTime)
          (*it).pop_front();
       }
    }
+}
+
+std::vector<EventListT>& Sequencer::getActiveNotes()
+{
+   return mActiveNotesVec;
+}
+
+void Sequencer::advanceTime(jack_nframes_t tm)
+{
+   mCurrentTime += tm;
 }

@@ -59,6 +59,7 @@ class Sequencer
       void setCurrentTime(jack_nframes_t time);
 
       jack_nframes_t getCurrentTime();
+      void advanceTime(jack_nframes_t tm);
 
       unsigned getTempo();
 
@@ -67,6 +68,8 @@ class Sequencer
       unsigned getQuant();
 
       void setQuant(unsigned q);
+
+      std::vector<EventListT>& getActiveNotes();
 };
 
 #endif
