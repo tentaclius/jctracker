@@ -22,20 +22,18 @@
 [v] Move the patterns and the player into separate classes.
 [v] Note length and timing in parts of current note length.
 [v] Modifiers to work for aliases.
-[-] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
+[v] Store output ports in an unsigned indexed vector. Store the index in Midi messages.
 [v] Allow several notes for the channel.
 [v] MIDI control messages.
 [v] MIDI control ramp. $4=1..100:3/2
 [v] MIDI pitch bend control.
 [v] Multiple matterns. define <name> ... end
 [v] wait command.
-[ ] Rewrite Events with virtual functions noteOn(), noteOff(), control()...
-[ ] Better error messages for the parser (with highlighting the error position).
-[ ] Output thread reading a message queue. The queue drops the messages if no room in the queue.
+[v] Rewrite Events with virtual functions noteOn(), noteOff(), control()...
 [ ] Track source file. Display the current lines while playing.
+[ ] Transposition and volume modifiers for subpatterns.
+[ ] Better error messages for the parser (with highlighting the error position).
 [ ] OSC controls.
-[ ] 'define' full pattern.
-[ ] Ligato.
 [ ] Transposition separately for each column.
 [ ] Unicode sharp/flat/natural signs.
 [ ] Add deliberate NOTE_END pattern.
