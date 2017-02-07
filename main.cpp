@@ -111,7 +111,6 @@ void signalHandler(int s)
    exit(1);
 }
 
-
 /*****************************************************************************************************/
 /* Read the data from the sequencer and queue the midi events to Jack */
 void play(JackEngine *jack, Sequencer &seq)
