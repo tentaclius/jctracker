@@ -3,7 +3,7 @@ LIBS = -ljack -lpthread -lm
 OPTS = -Wall -std=c++11
 
 OBJECTS = common.o events.o jackengine.o midictlevent.o midiheap.o midimessage.o noteevent.o parser.o sequencer.o
-COMMON_DEPS = Makefile common.h
+COMMON_DEPS = Makefile.opt common.h
 
 $(BIN): main.cpp $(COMMON_DEPS) $(OBJECTS)
 	$(CXX) main.cpp -o $@ $(OBJECTS) $(LIBS) $(OPTS) 
@@ -12,7 +12,7 @@ $(BIN): main.cpp $(COMMON_DEPS) $(OBJECTS)
 	$(CXX) -c $< $(OPTS)
 
 clear:
-	rm -f jctracker
+	rm -f jctracker.x86_64
 	rm -f *.o
 
 clean:
