@@ -185,7 +185,7 @@ NoteEvent* NoteEvent::clone()
 /* Virtual function to schedule NOTE ON. */
 ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
 {
-   trace("note event\n");
+   trace("note event col%x pitch%x\n", column, pitch);
 
    ControlFlow ret = {true, true, true};
 
@@ -219,7 +219,7 @@ ControlFlow NoteEvent::execute(JackEngine *jack, Sequencer *seq)
 /* Virtual function to stop the event. Queues NOTE_OFF. */
 void NoteEvent::stop(JackEngine *jack, Sequencer *seq)
 {
-   trace("note stop\n");
+   trace("note stop col%x pitch%x\n", column, pitch);
    jack->queueMidiEvent(MIDI_NOTE_OFF, pitch, 0, seq->getCurrentTime() - 1 - column,
          seq->getPortMap(column).channel, seq->getPortMap(column).port);
 }

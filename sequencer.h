@@ -44,10 +44,10 @@ class Sequencer
       EventListT getNextLine();
 
       /* Queue MIDI events from the current position of the sequencer. */
-      bool playNextLine(jack_nframes_t aCurrentTime = 0);
+      bool playNextLine();
 
       /* Stop all active notes. */
-      void silence(jack_nframes_t aCurrentTime = 0);
+      void silence();
 
       /* Reset sequencer position. */
       void initPosition();

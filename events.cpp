@@ -29,7 +29,7 @@ SkipEvent::~SkipEvent() {}
 
 ControlFlow SkipEvent::execute(JackEngine *jack, Sequencer *seq)
 {
-   trace("skip event\n");
+   trace("skip event col%x\n", column);
    return {true, true, false};
 }
 
@@ -73,7 +73,7 @@ PedalEvent::~PedalEvent() {}
 
 ControlFlow PedalEvent::execute(JackEngine *jack, Sequencer *seq)
 {
-   trace("pedal event\n");
+   trace("pedal event col%x\n", column);
    event->sustain(jack, seq);
    return {true, false, false};
 }
@@ -107,7 +107,8 @@ SubpatternPlayEvent::SubpatternPlayEvent(Sequencer *aSequencer, unsigned aColumn
 
 ControlFlow SubpatternPlayEvent::execute(JackEngine *jack, Sequencer *seq)
 {
-   trace("subpattern play\n");
+   trace("subpattern play col%x\n", column);
+   sequencer->setCurrentTime(seq->getCurrentTime());
    sequencer->initPosition();
    sequencer->playNextLine();
    return {true, true, true};
@@ -115,14 +116,14 @@ ControlFlow SubpatternPlayEvent::execute(JackEngine *jack, Sequencer *seq)
 
 void SubpatternPlayEvent::stop(JackEngine *jack, Sequencer *seq)
 {
-   trace("subpattern stop\n");
+   trace("subpattern stop col%x\n", column);
    sequencer->setCurrentTime(seq->getCurrentTime());
    sequencer->silence();
 }
 
 void SubpatternPlayEvent::sustain(JackEngine *jack, Sequencer *seq)
 {
-   trace("subpattern sustain\n");
+   trace("subpattern sustain col%x\n", column);
    sequencer->setCurrentTime(seq->getCurrentTime());
    sequencer->playNextLine();
 }

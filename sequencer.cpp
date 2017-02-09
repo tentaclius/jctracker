@@ -72,16 +72,11 @@ void Sequencer::readFromStream(std::istream &ss)
 
 /*****************************************************************************************************/
 /* Play one line and increment the internal position. */
-bool Sequencer::playNextLine(jack_nframes_t aCurrentTime)
+bool Sequencer::playNextLine()
 {
    std::vector<EventListT> nextActives (mActiveNotesVec.size());
 
    bool bAdvanceTime = false;
-
-   if (aCurrentTime != 0)
-      mCurrentTime = aCurrentTime;
-
-   trace("current time: %llu\n", (long long unsigned)mCurrentTime);
 
    while (!bAdvanceTime)
    {
@@ -92,6 +87,8 @@ bool Sequencer::playNextLine(jack_nframes_t aCurrentTime)
       // Start new notes. Loop through the event list.
       for (EventListT::iterator jt = eventLst.begin(); jt != eventLst.end(); jt ++)
       {
+         trace("current time: %llu\n", (long long unsigned)mCurrentTime);
+
          Event *event = *jt;
 
          // Execute the event.
@@ -451,25 +448,14 @@ void Sequencer::setQuant(unsigned q)
 
 /*****************************************************************************************************/
 /* Silence currently active events. */
-void Sequencer::silence(jack_nframes_t aCurrentTime)
+void Sequencer::silence()
 {
-   if (aCurrentTime != 0)
-      mCurrentTime = aCurrentTime;
-
    for (std::vector<EventListT>::iterator it = mActiveNotesVec.begin();
          it != mActiveNotesVec.end(); it ++)
    {
       while (!(*it).empty())
       {
-         NoteEvent *n = dynamic_cast<NoteEvent*>((*it).front());
-         if (n != NULL)
-            mJack->queueMidiEvent(MIDI_NOTE_OFF, n->pitch, 0, mCurrentTime - 1,
-                  mParser->getPortMap(n->column).channel, mParser->getPortMap(n->column).port);
-
-         SubpatternPlayEvent *s = dynamic_cast<SubpatternPlayEvent*>((*it).front());
-         if (s != NULL)
-            s->sequencer->silence();
-
+         (*it).front()->stop(mJack, this);
          (*it).pop_front();
       }
    }
