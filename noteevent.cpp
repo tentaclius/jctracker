@@ -50,40 +50,33 @@ NoteEvent::NoteEvent(const std::string &buf, unsigned aColumn)
       throw 0;
 
    // The note.
-   switch (iss.get())
+   switch (toupper(iss.get()))
    {
       case 'C':
-      case 'c':
          pitch = 0;
          break;
 
       case 'D':
-      case 'd':
          pitch = 2;
          break;
 
       case 'E':
-      case 'e':
          pitch = 4;
          break;
 
       case 'F':
-      case 'f':
          pitch = 5;
          break;
 
       case 'G':
-      case 'g':
          pitch = 7;
          break;
 
       case 'A':
-      case 'a':
          pitch = 9;
          break;
 
       case 'B':
-      case 'b':
          pitch = 11;
          break;
 
